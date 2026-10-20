@@ -1,6 +1,6 @@
 # Chrome / Edge 商店发布材料
 
-准备日期：2026-10-20；扩展版本：1.2.1。以下是提交草稿，尚未向商店提交审核或通过审核。
+准备日期：2026-10-20；扩展版本：1.2.2。以下是提交草稿，尚未向商店提交审核或通过审核。
 
 ## 名称与用途
 
@@ -57,7 +57,7 @@
 ## 上传文件与图片
 
 1. 运行 `python scripts/package.py`。
-2. 上传 `dist/chatgpt-feishu-copy-v1.2.1-store.zip`，其根目录包含 manifest.json。
+2. 上传 `dist/chatgpt-feishu-copy-v1.2.2-store.zip`，其根目录包含 manifest.json。
 3. 128×128 图标：`icons/128.png`。
 4. 1280×800 真实转换工具截图：`docs/assets/converter-1280x800.png`，仅含公开示例。
 5. Chrome 440×280 小型宣传图：`docs/assets/promo-440x280.png`。

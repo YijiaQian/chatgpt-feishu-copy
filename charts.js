@@ -3,18 +3,20 @@
   'use strict';
   const candidates='.recharts-wrapper,.js-plotly-plot,.vega-embed,[data-chart],[data-testid*="chart"],.chart-container,[role="graphics-document"]';
   const codeContainers='pre,code,[data-code-block],[data-code-block-source],[data-markdown-copy="code-block"]';
-  function visualCard(node){
+  const messageContainers='[data-markdown-text-style],[data-chatgpt-selection-message-id],[data-message-author-role]';
+  function visualCard(node,depth=0){
+    if(node.matches(messageContainers)||!node.matches('div,section,figure'))return false;
     const rect=node.getBoundingClientRect();if(rect.width<100||rect.height<40)return false;
     const style=getComputedStyle(node);
     const border=['borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth'].some(p=>parseFloat(style[p])>0);
     const background=style.backgroundColor!=='transparent'&&!/rgba\([^)]*,\s*0\s*\)$/.test(style.backgroundColor);
     if((border||background&&parseFloat(style.borderRadius)>0)&&node.textContent.trim())return true;
     // Layout libraries often add one transparent grid-item wrapper per card.
-    return node.children.length===1&&node.firstElementChild.matches('div,section,figure')&&visualCard(node.firstElementChild);
+    return depth<2&&node.children.length===1&&[...node.childNodes].every(n=>n.nodeType!==Node.TEXT_NODE||!n.textContent.trim())&&node.firstElementChild.matches('div,section,figure')&&visualCard(node.firstElementChild,depth+1);
   }
   function diagramRoots(root){
     const nodes=[...root.querySelectorAll('div,section,figure,[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]')].filter(node=>{
-      if(node.closest(codeContainers+',table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates+',pre,[data-code-block]'))return false;
+      if(node.matches(messageContainers)||node.closest(codeContainers+',table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates+',pre,[data-code-block]'))return false;
       const semantic=node.matches('[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]');
       const layout=/^(?:inline-)?(?:grid|flex)$/.test(getComputedStyle(node).display);
       if(!semantic&&!layout)return false;
@@ -25,8 +27,11 @@
       const bars=node.querySelectorAll('[data-d-has-height][data-d-clip]');
       const panels=node.querySelectorAll(':scope > [data-d-component="grid-item"],:scope > [data-d-component="box"]');
       const cards=node.matches('[data-d-component="grid"],[data-d-component="row"]')&&panels.length>=2;
-      const styledCards=layout&&[...node.children].filter(visualCard).length>=2;
-      return styledCards||boxes.length>=2&&(connectors.length>=1||bars.length>=1||cards);
+      // A prose renderer can itself be flex/grid and contain diagrams anywhere
+      // below it. Only a tight group of direct card panels qualifies here.
+      const children=[...node.children].filter(e=>getComputedStyle(e).display!=='none'&&!e.matches('[data-cfb-ui],script,style'));
+      const styledCards=layout&&children.length>=2&&children.every(e=>visualCard(e))&&[...node.childNodes].every(n=>n.nodeType!==Node.TEXT_NODE||!n.textContent.trim());
+      return styledCards||semantic&&boxes.length>=2&&(connectors.length>=1||bars.length>=1||cards);
     });
     return nodes.filter(node=>!nodes.some(parent=>parent!==node&&parent.contains(node)));
   }
@@ -36,11 +41,17 @@
     ctx.fillStyle=value;ctx.fillRect(0,0,1,1);const [r,g,b,a]=ctx.getImageData(0,0,1,1).data;
     return `rgba(${r},${g},${b},${a/255})`;
   }
-  function diagramHTML(node,images=new Map()){
+  function diagramHTML(node,images=new Map(),formulas=new Map()){
     const clone=node.cloneNode(true),source=[node,...node.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
     const properties=['display','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`)),'border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
     source.forEach((original,index)=>{
       const copy=copies[index],style=getComputedStyle(original);
+      if(formulas.has(original)){
+        const formula=formulas.get(original),img=document.createElement('img');
+        img.src=formula.dataUrl;img.alt=formula.tex;img.width=formula.width;img.height=formula.height;
+        img.style.cssText=formula.display?'display:block;margin:0 auto;max-width:100%;object-fit:contain':'display:inline-block;vertical-align:middle;max-width:100%;object-fit:contain';
+        copy.replaceWith(img);return;
+      }
       copy.removeAttribute('class');copy.removeAttribute('id');copy.removeAttribute('style');
       if(style.display==='none'||style.visibility==='hidden'||original.matches('button,script,style,iframe,form,input,textarea,.sr-only,[data-cfb-ui],[data-d-component="favicon"]')){copy.remove();return;}
       for(const property of properties){let value=style.getPropertyValue(property);if(value&&!/url\s*\(/i.test(value)){if(property.endsWith('color')||property==='fill'||property==='stroke')value=legacyColor(value);copy.style.setProperty(property,value);}}
@@ -65,7 +76,16 @@
       if(!src)throw new Error('卡片内图片尚未加载');
       images.set(img,(await media({src})).dataUrl);
     }
-    const result=await media({src:diagramHTML(node,images),diagram:true,width:Math.ceil(rect.width),height:Math.ceil(rect.height)});
+    // KaTeX's hidden MathML and positioned fraction layout cannot be flattened
+    // into generic card styles. Render each formula once before the snapshot.
+    const formulas=new Map(),selector=globalThis.CFB?.formulaSelector;
+    if(selector)for(const math of [...node.querySelectorAll(selector)].filter(e=>!e.parentElement?.closest(selector))){
+      const tex=CFB.texFrom(math);if(!tex)throw new Error('卡片公式缺少 LaTeX 源码');
+      const display=math.getAttribute('data-display')==='true'||math.matches('.katex-display,[display="block"],[display="true"],.math-display')||Boolean(math.querySelector('.katex-display,math[display="block"]'));
+      const rendered=await media({src:tex,formula:true,display}),scale=(parseFloat(getComputedStyle(math).fontSize)||16)/16;
+      formulas.set(math,{dataUrl:rendered.dataUrl,tex,display,width:Math.ceil((rendered.displayWidth||rendered.width/3)*scale),height:Math.ceil((rendered.displayHeight||rendered.height/3)*scale)});
+    }
+    const result=await media({src:diagramHTML(node,images,formulas),diagram:true,width:Math.ceil(rect.width),height:Math.ceil(rect.height)});
     return {dataUrl:result.dataUrl,width:result.displayWidth,height:result.displayHeight,kind:'diagram',alt:'流程图与卡片示意图'};
   }
   function chartRoots(root){
