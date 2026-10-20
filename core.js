@@ -281,5 +281,5 @@
     try{if(!document.execCommand('copy'))throw new Error('浏览器阻止了剪贴板写入，请保持页面在前台再试。');}
     finally{document.removeEventListener('copy',handler,true);}
   }
-  globalThis.CFB=Object.freeze({parseMarkdown,prepare,cloneAnswer,writeClipboard,cleanHTML,toText,texFrom,esc,formulaSelector});
+  globalThis.CFB=Object.freeze({parseMarkdown,prepare,cloneAnswer,writeClipboard,cleanHTML,toText,texFrom,esc,formulaSelector,readMath});
 })();

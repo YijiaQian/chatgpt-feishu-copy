@@ -92,5 +92,9 @@
     const root=document.createElement('div');root.innerHTML='<section id="styled-cards" style="display:grid;grid-template-columns:1fr 1fr;width:400px;gap:12px"><div style="background:#eee;border-radius:8px;height:90px">指标一 0.90</div><div style="border:1px solid #ccc;height:90px">指标二 0.10</div></section><div style="display:flex;width:400px;height:90px"><p>普通段落一</p><p>普通段落二</p></div><table style="display:grid;width:400px"><tr><td>原生表格</td></tr></table>';document.body.append(root);
     try{const roots=CFBCharts.diagramRoots(root);assert(roots.length===1&&roots[0].id==='styled-cards','Generic layout detection captured ordinary text or missed visual cards');}finally{root.remove();}
   });
+  await check('卡片现代颜色转换为截图引擎兼容的 RGB',async()=>{
+    const node=document.createElement('div');node.style.cssText='width:300px;height:80px;background:oklab(90% 0 0);border:1px solid oklch(50% 0.1 160);color:color(srgb 0.2 0.3 0.4)';node.textContent='现代颜色卡片';document.body.append(node);
+    try{const markup=CFBCharts.diagramHTML(node);assert(!/oklab|oklch|color\(srgb/i.test(markup),'Unsupported CSS color leaked to screenshot engine');const copy=document.createElement('div');copy.innerHTML=markup;assert(/rgba?\(/.test(copy.firstElementChild.style.backgroundColor),'RGB background missing');}finally{node.remove();}
+  });
   globalThis.TEST_RESULTS=results;document.getElementById('results').textContent=JSON.stringify(results,null,2);
 })();

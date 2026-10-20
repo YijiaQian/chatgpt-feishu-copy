@@ -7,7 +7,7 @@ import zipfile
 root=Path(__file__).resolve().parent.parent
 manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
 version=manifest['version']
-top_files=['manifest.json','background.js','charts.js','content.js','converter.html','converter.js','core.js','offscreen.html','offscreen.js','popup.html','popup.js','privacy.html','ui.css','LICENSE','THIRD_PARTY_NOTICES.md']
+top_files=['manifest.json','background.js','charts.js','content.js','conversation.js','archive.js','archive-viewer.js','converter.html','converter.js','core.js','offscreen.html','offscreen.js','popup.html','popup.js','privacy.html','ui.css','LICENSE','THIRD_PARTY_NOTICES.md']
 files=[root/name for name in top_files]
 for directory in ['icons','vendor']:
     files.extend(sorted(path for path in (root/directory).rglob('*') if path.is_file()))

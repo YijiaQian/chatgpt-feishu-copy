@@ -29,14 +29,20 @@
     });
     return nodes.filter(node=>!nodes.some(parent=>parent!==node&&parent.contains(node)));
   }
+  function legacyColor(value){
+    if(!/(?:oklab|oklch|lab|lch|color|color-mix)\(/i.test(value))return value;
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');
+    ctx.fillStyle=value;ctx.fillRect(0,0,1,1);const [r,g,b,a]=ctx.getImageData(0,0,1,1).data;
+    return `rgba(${r},${g},${b},${a/255})`;
+  }
   function diagramHTML(node,images=new Map()){
     const clone=node.cloneNode(true),source=[node,...node.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
-    const properties=['display','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left','border-top','border-right','border-bottom','border-left','border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
+    const properties=['display','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`)),'border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
     source.forEach((original,index)=>{
       const copy=copies[index],style=getComputedStyle(original);
       copy.removeAttribute('class');copy.removeAttribute('id');copy.removeAttribute('style');
       if(style.display==='none'||style.visibility==='hidden'||original.matches('button,script,style,iframe,form,input,textarea,.sr-only,[data-cfb-ui],[data-d-component="favicon"]')){copy.remove();return;}
-      for(const property of properties){const value=style.getPropertyValue(property);if(value&&!/url\s*\(/i.test(value))copy.style.setProperty(property,value);}
+      for(const property of properties){let value=style.getPropertyValue(property);if(value&&!/url\s*\(/i.test(value)){if(property.endsWith('color')||property==='fill'||property==='stroke')value=legacyColor(value);copy.style.setProperty(property,value);}}
       if(original.matches('svg')){const b=original.getBoundingClientRect();copy.setAttribute('width',Math.ceil(b.width));copy.setAttribute('height',Math.ceil(b.height));copy.setAttribute('xmlns','http://www.w3.org/2000/svg');}
       if(original.matches('img')&&images.has(original)){copy.setAttribute('src',images.get(original));copy.removeAttribute('srcset');}
     });

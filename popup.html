@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css"><title>ChatGPT → 飞书</title></head>
 <body class="popup">
-<div class="eyebrow">CHATGPT → FEISHU · 1.1.3</div>
+<div class="eyebrow">CHATGPT → FEISHU · 1.2.0</div>
 <h1>复制之后，直接粘贴。</h1><p class="muted">公式、图片与图表，一起带到飞书。</p>
 <label class="setting"><span>增强 ChatGPT 自带复制按钮</span><input type="checkbox" id="enabled"></label>
-<label class="setting"><span>嵌入图片和图标</span><input type="checkbox" id="embedImages"></label>
+<label class="setting"><span>复制时嵌入图片和图标</span><input type="checkbox" id="embedImages"></label>
 <label class="setting"><span>转换 Markdown 代码块的复制</span><input type="checkbox" id="markdownCode"></label>
-<button class="primary" id="open">打开 Markdown 转换工具 ↗</button>
+<button class="primary" id="export-conversation">导出当前会话到本地</button>
+<p class="hint">保存为离线 HTML，包含当前分支的双方消息、公式和可读取图片，打开后可复制到飞书。</p>
+<button id="open" style="width:100%">打开 Markdown 转换工具 ↗</button>
 <p class="hint">点击原复制按钮，或旁边的文档导出图标（悬停显示“复制到飞书”）。<br>按住 Alt 点击原按钮，可使用原始复制。仅支持浏览器网页版。</p>
 <div id="page-status" class="status" role="status">正在检查当前页面…</div>
 <button id="repair" style="width:100%;margin:10px 0">检查并启用当前页面</button>

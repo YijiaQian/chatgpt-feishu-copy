@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT → 飞书 · 公式图片复制",
-  "version": "1.1.3",
-  "description": "增强 ChatGPT 的复制按钮，保留标题、表格、代码、LaTeX 公式、图片与 SVG 图标，供飞书文档粘贴。",
+  "version": "1.2.0",
+  "description": "增强 ChatGPT 复制并导出当前会话为离线 HTML，保留飞书兼容的公式、表格、图片和图表。",
   "homepage_url": "https://github.com/YijiaQian/chatgpt-feishu-copy",
   "minimum_chrome_version": "116",
   "permissions": ["clipboardWrite", "storage", "offscreen", "scripting"],
@@ -15,7 +15,7 @@
   "content_scripts": [{
     "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
     "run_at": "document_start",
-    "js": ["vendor/markdown-it.min.js", "vendor/purify.min.js", "vendor/html2canvas.min.js", "charts.js", "core.js", "content.js"]
+    "js": ["vendor/markdown-it.min.js", "vendor/purify.min.js", "vendor/html2canvas.min.js", "charts.js", "core.js", "conversation.js", "archive.js", "content.js"]
   }],
   "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'; img-src 'self' data: blob: https:; font-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https: data: blob:;"}
 }

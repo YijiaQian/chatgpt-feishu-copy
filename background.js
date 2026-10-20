@@ -26,10 +26,23 @@ async function fetchImage(src){
   if(!mime.startsWith('image/'))throw new Error('图片地址返回了非图片内容，可能需要登录或链接已过期。');
   return blobData(new Blob(chunks,{type:mime}));
 }
+let archiveAssetsPromise;
+async function archiveAssets(){
+  if(!archiveAssetsPromise)archiveAssetsPromise=(async()=>{
+    const read=path=>fetch(chrome.runtime.getURL(path)).then(r=>{if(!r.ok)throw new Error('离线资源读取失败');return r.text();});
+    const [viewerScript,katexScript,css,katexLicense,projectLicense]=await Promise.all([read('archive-viewer.js'),read('vendor/katex.min.js'),read('vendor/katex.min.css'),read('vendor/katex.LICENSE'),read('LICENSE')]);
+    const fonts=[...new Set([...css.matchAll(/url\((fonts\/[A-Za-z0-9_-]+\.woff2)\)/g)].map(m=>m[1]))];
+    const embedded=await Promise.all(fonts.map(async path=>{const response=await fetch(chrome.runtime.getURL('vendor/'+path));if(!response.ok)throw new Error('离线字体读取失败');return [path,await blobData(new Blob([await response.arrayBuffer()],{type:'font/woff2'}))];}));
+    let katexCSS=css;for(const [path,data] of embedded)katexCSS=katexCSS.replaceAll('url('+path+')','url('+data+')');
+    return {viewerScript,katexScript,katexCSS,licenseText:'KaTeX:\n'+katexLicense+'\nChatGPT → Feishu viewer:\n'+projectLicense};
+  })().catch(error=>{archiveAssetsPromise=null;throw error;});
+  return archiveAssetsPromise;
+}
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
-  if(msg?.target!=='background'||msg.type!=='MEDIA')return;
+  if(msg?.target!=='background'||!['MEDIA','ARCHIVE_ASSETS'].includes(msg.type))return;
   // Content scripts may request media only from the two declared ChatGPT origins.
   if(sender.tab&&!sender.url?.startsWith(chrome.runtime.getURL(''))&&!/^https:\/\/(chatgpt\.com|chat\.openai\.com)\//.test(sender.url||'')){reply({ok:false,error:'来源页面未授权'});return;}
+  if(msg.type==='ARCHIVE_ASSETS'){archiveAssets().then(result=>reply({ok:true,result})).catch(e=>reply({ok:false,error:e.message}));return true;}
   (async()=>{
     let {src,svg,width,height,formula,display,diagram}=msg.payload||{};
     if(typeof src!=='string'||src.length>24*1024*1024)throw new Error('图片数据过大或无效。');

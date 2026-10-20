@@ -14,7 +14,7 @@ async function pageStatus(repair=false){
     const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
     if(!tab?.url?.match(/^https:\/\/(chatgpt\.com|chat\.openai\.com)\//)){status.textContent='请先切到 ChatGPT 对话网页。';return;}
     if(repair){
-      const files=['vendor/markdown-it.min.js','vendor/purify.min.js','vendor/html2canvas.min.js','charts.js','core.js','content.js'];
+      const files=['vendor/markdown-it.min.js','vendor/purify.min.js','vendor/html2canvas.min.js','charts.js','core.js','conversation.js','archive.js','content.js'];
       await chrome.scripting.executeScript({target:{tabId:tab.id},files});
     }
     const info=await chrome.tabs.sendMessage(tab.id,{type:'CFB_PING'});
@@ -22,4 +22,14 @@ async function pageStatus(repair=false){
   }catch(error){status.textContent='当前网页尚未连接扩展。点击下方“启用当前页面”，或刷新 ChatGPT 网页后重试。';}
 }
 document.getElementById('repair').addEventListener('click',()=>pageStatus(true));
+document.getElementById('export-conversation').addEventListener('click',async event=>{
+  const button=event.currentTarget,status=document.getElementById('page-status');button.disabled=true;
+  try{
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.url?.match(/^https:\/\/(chatgpt\.com|chat\.openai\.com)\/(c|g)\//))throw new Error('请先打开一条已有的 ChatGPT 对话。');
+    const result=await chrome.tabs.sendMessage(tab.id,{type:'CFB_EXPORT'});
+    if(!result?.ok)throw new Error(result?.error||'导出未启动，请刷新当前页面后重试。');
+    window.close();
+  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
 pageStatus();

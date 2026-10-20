@@ -17,9 +17,12 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
     with sync_playwright() as p:
         browser=p.chromium.launch(headless=True,**({'executable_path':args.browser} if args.browser else {}))
-        page=browser.new_page();page.goto(f'http://127.0.0.1:{server.server_port}/tests/core-tests.html')
-        page.wait_for_function('()=>Array.isArray(window.TEST_RESULTS)')
-        results=page.evaluate('TEST_RESULTS');browser.close()
+        page=browser.new_page();results=[]
+        for suite in ['core-tests.html','conversation-tests.html']:
+            page.goto(f'http://127.0.0.1:{server.server_port}/tests/{suite}')
+            page.wait_for_function('()=>Array.isArray(window.TEST_RESULTS)',timeout=60000)
+            results.extend(page.evaluate('TEST_RESULTS'))
+        browser.close()
     print(json.dumps(results,ensure_ascii=True,indent=2))
     failed=[r for r in results if not r['passed']]
     print(f"{len(results)-len(failed)}/{len(results)} passed")
