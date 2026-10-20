@@ -27,13 +27,11 @@
     return null;
   }
   function findSource(button){
-    const pre=button.closest('pre');
-    if(pre){
-      const code=pre.querySelector('code');
-      const lang=(code?.className||'')+' '+(pre.getAttribute('data-language')||'');
-      const header=pre.querySelector('[data-language],.text-xs')?.textContent||pre.textContent.slice(0,32);
-      if(settings.markdownCode&&(/language-(markdown|md)\b|\bmarkdown\b/i.test(lang+' '+header)))return {markdown:code?.textContent||''};
-      return null;
+    const block=button.closest(CFB.codeBlockSelector);
+    if(block){
+      const language=CFB.codeLanguage(block),code=CFB.codeText(block);
+      if(settings.markdownCode&&language==='markdown')return {markdown:code};
+      return {code,language};
     }
     const message=assistantFor(button);if(!message)return null;
     const table=button.closest('[class*="tableContainer"],[class*="TableContainer"],[class*="table-container"]')?.querySelector('table');
@@ -70,11 +68,12 @@
   async function convertSource(source,{embedImages=settings.embedImages}={}){
       let snapshots=new Map(),chartWarnings=[];
       if(source.element&&globalThis.CFBCharts){const captured=await CFBCharts.snapshot(source.element,{media});snapshots=captured.snapshots;chartWarnings=captured.warnings;}
-      const root=source.markdown!==undefined?CFB.parseMarkdown(source.markdown):CFB.cloneAnswer(source.element,{snapshots});
+      const root=source.code!==undefined?CFB.codeBlock(source.code,source.language):source.markdown!==undefined?CFB.parseMarkdown(source.markdown):CFB.cloneAnswer(source.element,{snapshots});
       if(source.element?.querySelector('iframe'))chartWarnings.push('检测到内嵌页面：如果图表在 iframe 内，请先打开图表，再使用图表下载功能插入原图。');
       const result=await CFB.prepare(root,{media,embedImages});
       result.warnings.push(...chartWarnings);result.stats.charts=[...snapshots.values()].filter(shot=>shot.kind!=='diagram').length;result.stats.diagrams=[...snapshots.values()].filter(shot=>shot.kind==='diagram').length;
       if(!result.text&&!result.stats.images&&!result.stats.icons)throw new Error('没有找到可复制的内容。');
+      if(source.code!==undefined)result.text=source.code;
       return result;
   }
   async function copy(source){
@@ -136,9 +135,10 @@
   // Inherit the native toolbar's sizing, colors, hover and dark-mode styles.
   function mountActions(){
     for(const native of document.querySelectorAll('button[data-testid="copy-turn-action-button"],article button[aria-label],article button[title],[data-content-search-turn-key] button[aria-label],[data-turn-key] button[aria-label]')){
-      if(native.closest('[data-cfb-ui]')||!isCopy(native)||native.closest('pre')||native.nextElementSibling?.hasAttribute('data-cfb-ui'))continue;
+      if(native.closest('[data-cfb-ui]')||!isCopy(native)||native.nextElementSibling?.hasAttribute('data-cfb-ui'))continue;
       if(!assistantFor(native))continue;
       const own=document.createElement('button');own.type='button';own.className=native.className;own.title='复制到飞书 · 含公式和图表';own.setAttribute('aria-label','复制到飞书');own.setAttribute('data-cfb-ui','true');
+      if(native.closest(CFB.codeBlockSelector)){own.title='复制代码到飞书';own.setAttribute('aria-label','复制代码到飞书');}
       own.style.cssText='display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer';
       const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
       for(const [key,value] of Object.entries({width:'20',height:'20',viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))icon.setAttribute(key,value);

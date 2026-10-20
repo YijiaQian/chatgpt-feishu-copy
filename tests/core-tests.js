@@ -96,5 +96,17 @@
     const node=document.createElement('div');node.style.cssText='width:300px;height:80px;background:oklab(90% 0 0);border:1px solid oklch(50% 0.1 160);color:color(srgb 0.2 0.3 0.4)';node.textContent='现代颜色卡片';document.body.append(node);
     try{const markup=CFBCharts.diagramHTML(node);assert(!/oklab|oklch|color\(srgb/i.test(markup),'Unsupported CSS color leaked to screenshot engine');const copy=document.createElement('div');copy.innerHTML=markup;assert(/rgba?\(/.test(copy.firstElementChild.style.backgroundColor),'RGB background missing');}finally{node.remove();}
   });
+  await check('新版无 pre 的 ChatGPT 代码块保留语言、注释和精确缩进',async()=>{
+    const source='# 仅作简化示意\nwhile not finished:\n    response = llm(messages)\n\n    # $literal$ 不转公式\n    return "<done>"\n';
+    const root=document.createElement('div');root.innerHTML='<p>代码之前</p><div data-code-block="true" data-markdown-copy="code-block"><div data-markdown-copy="exclude"><span>Python</span><button>复制代码</button><button>运行</button></div><div data-code-block-source="true"><code></code></div></div><p>代码之后</p>';root.querySelector('code').textContent=source;document.body.append(root);
+    try{const result=await CFB.prepare(CFB.cloneAnswer(root),{media}),parsed=document.createElement('div');parsed.innerHTML=result.html;const code=parsed.querySelector('pre > code');assert(code?.textContent===source,'Code indentation, blank lines or source changed');assert(code.className==='language-python'&&code.dataset.larkLanguage==='python','Python metadata missing');assert(result.stats.formulas===0&&!parsed.querySelector('h1'),'Code comment or dollar literal interpreted as prose');assert(!result.html.includes('复制代码')&&!result.html.includes('运行'),'Code toolbar leaked');assert(parsed.textContent.includes('代码之前')&&parsed.textContent.includes('代码之后'),'Surrounding prose lost');}finally{root.remove();}
+  });
+  await check('直接 HTML、旧版 pre 和未知语言仍输出标准代码块',async()=>{
+    const result=await CFB.prepare('<pre class="language-js"><code>const x = "$x$";\n  // 中文\n</code></pre><div data-code-block="true"><div data-code-block-source="true"><code>第一行<br>    第二行</code></div></div>',{media});const root=document.createElement('div');root.innerHTML=result.html;const blocks=root.querySelectorAll('pre > code');assert(blocks.length===2,'Code blocks missing');assert(blocks[0].dataset.larkLanguage==='javascript','Language alias not normalized');assert(blocks[1].dataset.larkLanguage==='plaintext'&&blocks[1].textContent==='第一行\n    第二行','Plaintext code or br newline lost');assert(result.stats.formulas===0,'Raw code interpreted as formula');
+  });
+  await check('代码容器不会被通用卡片或图表截图规则捕获',async()=>{
+    const root=document.createElement('div');root.innerHTML='<div data-code-block="true" style="display:grid;width:400px;grid-template-columns:1fr 1fr"><div style="border:1px solid gray;height:80px">Python</div><div style="border:1px solid gray;height:80px"><svg width="160" height="80"><path d="M0 0L160 80"/></svg></div><div data-code-block-source="true"><code>print(1)</code></div></div>';document.body.append(root);
+    try{assert(CFBCharts.diagramRoots(root).length===0&&CFBCharts.chartRoots(root).length===0,'Code block rasterized as a chart');}finally{root.remove();}
+  });
   globalThis.TEST_RESULTS=results;document.getElementById('results').textContent=JSON.stringify(results,null,2);
 })();

@@ -59,6 +59,7 @@
     }
     assets={viewerScript,katexScript,katexCSS};assert((katexCSS.match(/@font-face/g)||[]).length===20,'Bundled font faces missing');assert(!katexCSS.includes('url(fonts/'),'Offline CSS needs external font files');
     const prepared=await CFB.prepare(CFB.parseMarkdown('行内 $x^2$。\n\n$$\\frac{a}{b}$$\n\n```text\n$keep_literal$\n```'));
+    const code=await CFB.prepare('<div data-code-block="true"><div data-markdown-copy="exclude">Python<button>运行</button></div><div data-code-block-source="true"><code># 注释保持代码\n    return "$literal$"</code></div></div>');prepared.html+=code.html;
     output=CFBArchive.build({title:'测试 </title><script>window.PWNED=1</script>',url:'https://chatgpt.com/c/example',createdAt:new Date().toISOString(),messages:[{role:'user',html:'<p>第一问</p>',stats:{},warnings:[]},{role:'assistant',...prepared}]},assets);
     assert(!output.html.includes('<script>window.PWNED'),'Untrusted title executable');assert(output.html.includes('data-export-tex="x^2"'),'Formula metadata absent');assert(output.html.includes('$keep_literal$'),'Code modified');assert(output.stats.users===1&&output.stats.assistants===1,'Export roles not counted');assert(!/[<>:"/\\|?*]/.test(output.filename),'Unsafe filename');
   });
@@ -68,8 +69,10 @@
     try{
       await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Offline viewer load timeout')),8000);frame.onload=()=>{clearTimeout(timer);resolve();};frame.srcdoc=output.html;});
       const doc=frame.contentDocument,win=frame.contentWindow;assert(doc.querySelectorAll('.katex').length===2,'Offline formula preview failed');assert(!win.PWNED,'Archive executed untrusted title');
+      assert(doc.querySelector('pre > code.language-python')?.textContent==='# 注释保持代码\n    return "$literal$"','Exported code lost its native block or indentation');
       let copied;Object.defineProperty(win.navigator,'clipboard',{configurable:true,value:{write:async items=>{copied={html:await(await items[0].getType('text/html')).text(),text:await(await items[0].getType('text/plain')).text()};}}});
       doc.getElementById('copy-all').click();await new Promise(r=>setTimeout(r,50));assert(copied?.html.includes('$x^2$')&&copied.html.includes('$$\\frac{a}{b}$$'),'Copy did not restore native formula source');assert(!copied.html.includes('class="katex')&&!copied.html.includes('复制本条'),'Viewer markup or buttons copied');assert(copied.text.includes('第一问')&&copied.text.includes('keep_literal'),'Conversation text lost');
+      assert(copied.html.includes('data-lark-language="python"')&&copied.html.includes('# 注释保持代码'),'Offline copy dropped Python code metadata');
       copied=null;doc.querySelectorAll('[data-copy-message]')[1].click();await new Promise(r=>setTimeout(r,50));assert(copied&&!copied.text.includes('第一问'),'Per-message copy included another message');
     }finally{frame.remove();}
   });

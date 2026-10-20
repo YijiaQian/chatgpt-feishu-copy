@@ -6,6 +6,37 @@
   const uiSelector = 'button,[role=button],[data-cfb-ui],script,style,iframe,form,textarea,input,nav';
   const formulaSelector = '[data-cfb-math],.katex-display,[data-math-source],[data-latex],.katex,mjx-container,math';
   const blockTags = new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','H5','H6','PRE','BLOCKQUOTE','UL','OL','LI','TABLE','TR','HR']);
+  const codeBlockSelector='pre,[data-code-block],[data-code-block-source],[data-markdown-copy="code-block"],[data-d-component="code-block"]';
+  function codeLanguage(block){
+    const code=block.querySelector('code');
+    const nodes=[code,block,block.querySelector('[data-language],[data-lark-language]')].filter(Boolean);
+    let value='';
+    for(const node of nodes){value=node.getAttribute('data-lark-language')||node.getAttribute('data-language')||node.getAttribute('lang')||node.className?.match?.(/\blanguage-([\w+#.-]+)/)?.[1]||'';if(value)break;}
+    if(!value){
+      const header=block.querySelector('[data-markdown-copy="exclude"],[data-code-block-controls]')?.cloneNode(true);
+      header?.querySelectorAll('button,[role="button"],svg,.sr-only').forEach(node=>node.remove());
+      value=header?.textContent.trim()||'';
+    }
+    value=value.toLowerCase().trim().replace(/^language-/, '');
+    const aliases={py:'python',python3:'python',js:'javascript',ts:'typescript',sh:'bash',shell:'bash',zsh:'bash',md:'markdown',yml:'yaml',csharp:'c#',cpp:'c++','纯文本':'plaintext','文本':'plaintext',text:'plaintext','plain text':'plaintext'};
+    value=aliases[value]||value;
+    return /^[\w+#.-]{1,32}$/.test(value)?value:'plaintext';
+  }
+  function codeText(block){
+    const body=block.querySelector('[data-code-block-source] code')||block.querySelector('pre code')||block.querySelector('code')||block.querySelector('.cm-content')||block.querySelector('[data-code-block-source]')||block;
+    const lines=[...body.querySelectorAll('.cm-line')];
+    if(lines.length)return lines.map(line=>line.textContent).join('\n');
+    const copy=body.cloneNode(true);copy.querySelectorAll('br').forEach(br=>br.replaceWith(document.createTextNode('\n')));
+    return copy.textContent.replace(/\r\n?/g,'\n');
+  }
+  function codeBlock(text,language='plaintext'){
+    const pre=document.createElement('pre'),code=document.createElement('code');
+    code.className='language-'+language;code.setAttribute('data-lark-language',language);code.textContent=text;pre.append(code);return pre;
+  }
+  function normalizeCodeBlocks(root){
+    const blocks=[...root.querySelectorAll(codeBlockSelector)].filter(node=>!node.parentElement?.closest(codeBlockSelector));
+    for(const block of blocks){if(block.hasAttribute('data-cfb-remove'))block.remove();else block.replaceWith(codeBlock(codeText(block),codeLanguage(block)));}
+  }
   function mathHTML(tex, display) {
     return `<span data-cfb-math="true" data-tex="${esc(tex)}" data-display="${display}">${esc(display ? `$$${tex}$$` : `$${tex}$`)}</span>`;
   }
@@ -123,6 +154,9 @@
       }
       if(getComputedStyle(node).display==='none'&&!node.closest(formulaSelector))copy.setAttribute('data-cfb-remove','true');
     });
+    // Modern ChatGPT renders a block as a div + code, without a pre. Rebuild
+    // semantic blocks before removing the toolbar that contains the language.
+    normalizeCodeBlocks(clone);
     // Source-chip favicons are decoration, not document illustrations. Keep the
     // surrounding citation/link text without downloading their tracking URLs.
     clone.querySelectorAll('[data-d-component="popover-trigger"][role="button"]').forEach(node=>{
@@ -174,12 +208,13 @@
       // Feishu's HTML importer uses ace-table to distinguish native document tables
       // from embedded Sheets. Cell formulas are handled as images below.
       if(tag==='TABLE')node.className='ace-table';
-      if(language){node.className='language-'+language;node.setAttribute('data-language',language);}
+      if(language){node.className='language-'+language;node.setAttribute('data-language',language);node.setAttribute('data-lark-language',language);}
       if(tag==='A'&&!/^(https?:|mailto:)/i.test(node.getAttribute('href')||''))node.removeAttribute('href');
     }
   }
   async function prepare(input,{media,embedImages=true}={}){
     const root=document.createElement('div');root.innerHTML=cleanHTML(input.outerHTML||input);
+    normalizeCodeBlocks(root);
     const warnings=[],stats={formulas:0,images:0,icons:0,tableFormulas:0};
     if(/(?:^|\n)\s*Chart\s*(?:\n|$)/.test(root.innerText||root.textContent)&&!root.querySelector('svg,canvas,img'))warnings.push('文本里只有 Chart 占位符，没有图表数据。Markdown 无法还原原图；请从原始网页复制，或插入图表图片。');
     // Text-only equations also occur in raw HTML tables and unrendered answers.
@@ -281,5 +316,5 @@
     try{if(!document.execCommand('copy'))throw new Error('浏览器阻止了剪贴板写入，请保持页面在前台再试。');}
     finally{document.removeEventListener('copy',handler,true);}
   }
-  globalThis.CFB=Object.freeze({parseMarkdown,prepare,cloneAnswer,writeClipboard,cleanHTML,toText,texFrom,esc,formulaSelector,readMath});
+  globalThis.CFB=Object.freeze({parseMarkdown,prepare,cloneAnswer,writeClipboard,cleanHTML,toText,texFrom,esc,formulaSelector,readMath,codeBlockSelector,codeLanguage,codeText,codeBlock});
 })();

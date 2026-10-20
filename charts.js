@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const candidates='.recharts-wrapper,.js-plotly-plot,.vega-embed,[data-chart],[data-testid*="chart"],.chart-container,[role="graphics-document"]';
+  const codeContainers='pre,code,[data-code-block],[data-code-block-source],[data-markdown-copy="code-block"]';
   function visualCard(node){
     const rect=node.getBoundingClientRect();if(rect.width<100||rect.height<40)return false;
     const style=getComputedStyle(node);
@@ -13,7 +14,7 @@
   }
   function diagramRoots(root){
     const nodes=[...root.querySelectorAll('div,section,figure,[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]')].filter(node=>{
-      if(node.closest('pre,code,table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates))return false;
+      if(node.closest(codeContainers+',table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates+',pre,[data-code-block]'))return false;
       const semantic=node.matches('[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]');
       const layout=/^(?:inline-)?(?:grid|flex)$/.test(getComputedStyle(node).display);
       if(!semantic&&!layout)return false;
@@ -70,11 +71,11 @@
   function chartRoots(root){
     const nodes=new Set();
     for(const element of root.querySelectorAll(candidates)){
-      if(element.closest('.katex,mjx-container,math')||!element.querySelector('svg,canvas'))continue;
+      if(element.closest(codeContainers+',.katex,mjx-container,math')||!element.querySelector('svg,canvas'))continue;
       const rect=element.getBoundingClientRect();if(rect.width>90&&rect.height>60)nodes.add(element);
     }
     for(const graphic of root.querySelectorAll('svg,canvas')){
-      if(graphic.closest('.katex,mjx-container,math,button,[data-cfb-ui]'))continue;
+      if(graphic.closest(codeContainers+',.katex,mjx-container,math,button,[data-cfb-ui]'))continue;
       if([...nodes].some(n=>n.contains(graphic)))continue;
       const rect=graphic.getBoundingClientRect();
       if(rect.width>100&&rect.height>60)nodes.add(graphic);
