@@ -11,6 +11,7 @@
 - [隐私说明](https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/PRIVACY.md)
 - [报告问题](https://github.com/YijiaQian/chatgpt-feishu-copy/issues)
 - [参与开发](CONTRIBUTING.md) · [商店发布材料](docs/store-listing.zh-CN.md)
+- [产品需求文档与架构流程图](docs/PRD.zh-CN.md)
 
 ![独立 Markdown 转换工具](docs/assets/converter-1280x800.png)
 
