@@ -8,7 +8,7 @@
 这是独立开源工具，与 OpenAI、飞书、Google 或 Microsoft 没有隶属或官方合作关系。当前提供手动安装包；尚未上架 Chrome 或 Edge 插件市场。
 
 - [下载最新版本](https://github.com/YijiaQian/chatgpt-feishu-copy/releases/latest)
-- [隐私说明](https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/privacy.html)
+- [隐私说明](https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/PRIVACY.md)
 - [报告问题](https://github.com/YijiaQian/chatgpt-feishu-copy/issues)
 - [参与开发](CONTRIBUTING.md) · [商店发布材料](docs/store-listing.zh-CN.md)
 

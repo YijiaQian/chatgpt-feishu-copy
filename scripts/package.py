@@ -22,7 +22,7 @@ for kind,prefix in [('store',''),('manual','chatgpt-feishu-copy/')]:
     archive=dist/f'chatgpt-feishu-copy-v{version}-{kind}.zip'
     selected=list(files)
     if kind=='manual':
-        selected.extend(root/name for name in ['README.md','CHANGELOG.md','CONTRIBUTING.md'])
+        selected.extend(root/name for name in ['README.md','CHANGELOG.md','CONTRIBUTING.md','PRIVACY.md'])
         for directory in ['docs','tests','scripts']:
             selected.extend(path for path in (root/directory).rglob('*') if path.is_file() and '__pycache__' not in path.parts and path.suffix!='.pyc')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as bundle:

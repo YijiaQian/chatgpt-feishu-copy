@@ -28,10 +28,9 @@
 
 - 主页：https://github.com/YijiaQian/chatgpt-feishu-copy
 - 支持：https://github.com/YijiaQian/chatgpt-feishu-copy/issues
-- 隐私政策：https://yijiaqian.github.io/chatgpt-feishu-copy/privacy.html
-- 备用隐私页面：https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/privacy.html
+- 隐私政策：https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/PRIVACY.md
 
-只有确认 GitHub Pages 页面可以匿名访问时才填写 Pages 地址；否则可填写可访问的 GitHub 隐私页面，或用自己控制的网站托管相同内容。
+以上 GitHub 隐私页面提供可读的 Markdown 版本；扩展安装包内提供相同内容的 privacy.html。提交时请确认所填网址可匿名访问。
 
 ## 权限用途
 
