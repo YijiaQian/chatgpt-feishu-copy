@@ -1,7 +1,21 @@
 /* SPDX-License-Identifier: MIT */
 'use strict';
 let queue=Promise.resolve();
-async function raster({src,svg,formula,display}){
+async function raster({src,svg,formula,display,diagram,width,height}){
+  if(diagram){
+    if(!Number.isFinite(width)||!Number.isFinite(height)||width<1||height<1||width*height>8_000_000)throw new Error('流程图尺寸无效或过大');
+    const root=document.createElement('div');root.style.cssText=`width:${width}px;background:white;color:#1f2329;padding:0;overflow:hidden`;
+    root.innerHTML=DOMPurify.sanitize(src,{USE_PROFILES:{html:true,svg:true,mathMl:true},FORBID_TAGS:['script','style','iframe','object','embed','form','input','textarea','video','audio','foreignObject','image','use'],FORBID_ATTR:['href','xlink:href','srcset','srcdoc']});
+    root.querySelectorAll('*').forEach(node=>{for(const property of [...node.style])if(/url\s*\(|@import/i.test(node.style.getPropertyValue(property)))node.style.removeProperty(property);});
+    root.querySelectorAll('img').forEach(img=>{if(!/^data:image\/(png|jpeg|webp);base64,/i.test(img.getAttribute('src')||''))img.remove();});
+    document.body.append(root);
+    try{
+      await document.fonts.ready;
+      const canvas=await html2canvas(root,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:false,windowWidth:Math.max(1024,width),windowHeight:Math.max(1024,height),scrollX:0,scrollY:0});
+      const dataUrl=canvas.toDataURL('image/png');if(dataUrl.length>20*1024*1024)throw new Error('流程图过大，请拆分后复制');
+      return {dataUrl,width:canvas.width,height:canvas.height,displayWidth:Math.ceil(canvas.width/2),displayHeight:Math.ceil(canvas.height/2)};
+    }finally{root.remove();}
+  }
   if(formula){
     const root=document.createElement('div');root.style.cssText='display:inline-block;width:max-content;white-space:nowrap;background:white;color:#1f2329;padding:5px 7px;font-size:16px';
     document.body.append(root);

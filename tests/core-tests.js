@@ -72,5 +72,25 @@
       assert(colored>500,'Blank screenshot without colored curves');assert(shot.width>320,'No padding for axis labels');
     }finally{root.remove();}
   });
+  await check('引用来源图标不作为正文图片下载 且真实插图保留',async()=>{
+    const element=document.createElement('div');element.innerHTML=`<p>来源：<a href="https://example.org/paper"><span data-d-component="favicon"><img width="12" src="https://www.google.com/s2/favicons?domain=https://example.org&sz=32"></span>研究来源</a></p><img alt="actual illustration" src="${png}" width="160">`;document.body.append(element);
+    try{const r=await CFB.prepare(CFB.cloneAnswer(element),{media});assert(!r.html.includes('favicons')&&!r.html.includes('查看原图'),'Citation favicon leaked');assert(r.html.includes('https://example.org/paper')&&r.html.includes('研究来源'),'Citation link lost');assert(r.stats.images===1,'Real illustration lost');}finally{element.remove();}
+  });
+  await check('流程卡片选择完整外层且不捕获普通提示文字',async()=>{
+    const root=document.createElement('div');root.innerHTML='<div data-d-component="box" data-d-has-border id="flow" style="width:400px;height:200px"><div data-d-component="box">步骤一</div><div data-d-component="row"><svg data-d-component="icon" width="16" height="16"><path d="M0 0L16 16"/></svg></div><div data-d-component="box">步骤二</div></div><div data-d-component="box" data-d-has-border style="width:400px;height:60px"><p>普通提示段落保持文本</p></div>';document.body.append(root);
+    try{const roots=CFBCharts.diagramRoots(root);assert(roots.length===1&&roots[0].id==='flow','Wrong diagram boundary');const clone=CFB.cloneAnswer(root,{snapshots:new Map([[roots[0],{dataUrl:png,width:400,height:200,alt:'完整流程图'}]])});assert(clone.querySelectorAll('img').length===1&&!clone.querySelector('svg'),'Flow was split into icons');assert(clone.textContent.includes('普通提示段落保持文本'),'Unrelated text lost');}finally{root.remove();}
+  });
+  await check('无箭头数字卡片整组捕获且保留卡片内真实图片',async()=>{
+    const root=document.createElement('div');root.innerHTML='<div data-d-component="grid" style="display:grid;grid-template-columns:1fr 1fr;width:400px;height:140px"><div data-d-component="grid-item"><div data-d-component="box"><p>正样本概率 P</p><h1>0.90</h1><p>Loss ≈ 0.105</p><img src="https://example.org/card.png" width="20" height="20"></div></div><div data-d-component="grid-item"><div data-d-component="box"><p>正样本概率 P</p><h1>0.10</h1><p>Loss ≈ 2.303</p></div></div></div>';document.body.append(root);
+    try{const roots=CFBCharts.diagramRoots(root);assert(roots.length===1,'Number cards not recognized');let markup='';const result=await CFBCharts.snapshot(root,{media:async payload=>{if(payload.diagram){markup=payload.src;return {dataUrl:png,displayWidth:400,displayHeight:140};}assert(payload.src==='https://example.org/card.png','Wrong card image');return {dataUrl:png};}});assert(result.snapshots.size===1&&!result.warnings.length,'Card snapshot failed');assert(markup.includes('0.90')&&markup.includes('0.10')&&markup.includes('grid-template-columns'),'Card content or layout lost');assert(markup.includes(png)&&!markup.includes('example.org/card.png'),'Card illustration lost or remote request leaked');}finally{root.remove();}
+  });
+  await check('弹出式引用没有可读链接时保留来源标签',async()=>{
+    const root=document.createElement('div');root.innerHTML='<p>正文<span role="button" data-d-component="popover-trigger"><span data-d-component="favicon"><img src="https://www.google.com/s2/favicons?domain=https://example.org&sz=32"></span>研究来源</span></p>';document.body.append(root);
+    try{const result=await CFB.prepare(CFB.cloneAnswer(root),{media});assert(result.html.includes('来源：研究来源'),'Source label lost');assert(!result.html.includes('favicons')&&result.stats.images===0,'Source icon treated as illustration');}finally{root.remove();}
+  });
+  await check('没有 ChatGPT 专用标记时按 Grid 和卡片样式识别',async()=>{
+    const root=document.createElement('div');root.innerHTML='<section id="styled-cards" style="display:grid;grid-template-columns:1fr 1fr;width:400px;gap:12px"><div style="background:#eee;border-radius:8px;height:90px">指标一 0.90</div><div style="border:1px solid #ccc;height:90px">指标二 0.10</div></section><div style="display:flex;width:400px;height:90px"><p>普通段落一</p><p>普通段落二</p></div><table style="display:grid;width:400px"><tr><td>原生表格</td></tr></table>';document.body.append(root);
+    try{const roots=CFBCharts.diagramRoots(root);assert(roots.length===1&&roots[0].id==='styled-cards','Generic layout detection captured ordinary text or missed visual cards');}finally{root.remove();}
+  });
   globalThis.TEST_RESULTS=results;document.getElementById('results').textContent=JSON.stringify(results,null,2);
 })();

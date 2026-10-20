@@ -1,4 +1,4 @@
-# ChatGPT → 飞书 · 公式图片复制 v1.1.2
+# ChatGPT → 飞书 · 公式图片复制 v1.1.3
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -19,7 +19,7 @@
 
 先停用旧版，解压新版，再加载新版的 `chatgpt-feishu-copy` 文件夹，最后刷新 ChatGPT 对话页。若覆盖原文件夹，则在扩展管理页点击该扩展的「重新加载」，再刷新对话页。
 
-新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.1.2；没有连接时点击「检查并启用当前页面」。
+新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.1.3；没有连接时点击「检查并启用当前页面」。
 
 已用实际 ChatGPT 对话中的自带复制按钮验证：35 个公式、2 张原始 Recharts 曲线图和 4 个表格公式图片进入剪贴板，粘贴到真实飞书文档后保存为 31 个原生公式和 6 个图片块。
 
@@ -44,6 +44,7 @@
 - 点击扩展图标可关闭增强复制、控制图片嵌入，或打开独立转换工具。
 - 独立工具支持已有 Markdown、本地图片、预览、复制与导出兼容 HTML。
 - SVG / Recharts 曲线图和可读取的 Canvas 图表会整张截图为 PNG，保留曲线、坐标轴及图例。
+- 流程、并排数字卡片和进度条等视觉布局会整组转换为 PNG，保留文字、背景及箭头。识别结合 ChatGPT 组件标记与 Grid / Flex 卡片样式，不依赖具体文案。
 
 仅复制成纯 Markdown 后，如果内容里只剩 `Chart` 和图例，原始图表数据已经丢失，无法从这些文字自动还原原图。请直接从原始 ChatGPT 网页复制，或通过「插入本地图片」补入图表。新版会明确提示这类缺失。跨域 iframe 内的图表仍需先下载或导出原图。
 
@@ -62,6 +63,8 @@
 | 代码块 | 原生代码块，保留语言标识与源码 |
 | 可读取的生成图片、普通图片 | 嵌入图片，粘贴时由飞书上传到文档 |
 | SVG 图标、已渲染的 SVG 示意图 | 本地栅格化为 PNG |
+| 流程卡片、并排指标卡片、进度条组件 | 整组静态 PNG，卡片内文字无法单独编辑 |
+| 来源引用的小型网站图标 | 去除装饰图标，保留可读的引用链接或来源标签 |
 | Emoji 图标 | Unicode 字符 |
 
 飞书当前粘贴转换不自动处理表格单元格的 LaTeX，因此表格公式使用图片保证显示。兼容 HTML 的图片说明保留公式源码，但飞书不一定保留该说明；需要继续编辑时请保留原 Markdown 或导出的 HTML。正文公式保持可编辑。
@@ -84,6 +87,8 @@
 
 2026-10-20：内核 15 项检查再次通过；v1.1.1 的图标复制已在真实 ChatGPT 页面验收。v1.1.2 增加隐私说明并收窄固定网站权限，转换算法保持一致。
 
+v1.1.3：新增完整流程、无箭头的并排数字卡片、来源图标和通用 Grid / Flex 识别检查，内核共 20 项。真实网页原生复制后，在飞书通过 Ctrl+V 验证同一回复保留 12 个原生公式、1 张完整数字卡片图和 1 张完整流程图，无来源图标占位。布局识别使用启发式规则，复杂 iframe 和未渲染内容仍不在保证范围内。
+
 本地检查不需要飞书凭据，也不写在线文档：
 
 ```text
@@ -102,7 +107,7 @@ python tests/run_tests.py --work-dir work/test-tmp
 
 ## 源码和依赖
 
-`content.js` 适配复制按钮，`charts.js` 捕获 SVG / Canvas 图表，`core.js` 转换结构和剪贴板，`background.js` 下载图片，`offscreen.js` 本地栅格化，`converter.html` 是独立工具，`tests/` 是可复现内核检查。无需构建，源码直接加载。
+`content.js` 适配复制按钮，`charts.js` 识别视觉卡片并捕获 SVG / Canvas 图表，`core.js` 转换结构和剪贴板，`background.js` 下载图片，`offscreen.js` 在隔离页面渲染布局及图片，`converter.html` 是独立工具，`tests/` 是可复现内核检查。无需构建，源码直接加载。
 
 运行 `python scripts/package.py`，会在 `dist/` 生成商店包、手动安装包及 SHA-256 校验文件。打包使用固定文件清单，不包含测试、Git 历史、开发配置或私有验收材料。项目自身代码采用 [MIT](LICENSE) 许可，依赖采用各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

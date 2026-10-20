@@ -90,7 +90,7 @@
     srcNodes.forEach((node,i)=>{
       const copy=dstNodes[i];
       if(snapshots.has(node)){
-        const shot=snapshots.get(node),img=document.createElement('img');img.src=shot.dataUrl;img.alt='交互曲线图';
+        const shot=snapshots.get(node),img=document.createElement('img');img.src=shot.dataUrl;img.alt=shot.alt||'交互曲线图';
         img.setAttribute('data-cfb-width',String(shot.width));img.setAttribute('data-cfb-height',String(shot.height));
         img.setAttribute('data-cfb-chart-image','true');
         if(node===source){clone.replaceChildren(img);}else copy.replaceWith(img);
@@ -122,6 +122,20 @@
         copy.setAttribute('data-cfb-height',String(Math.round(rect.height)||32));
       }
       if(getComputedStyle(node).display==='none'&&!node.closest(formulaSelector))copy.setAttribute('data-cfb-remove','true');
+    });
+    // Source-chip favicons are decoration, not document illustrations. Keep the
+    // surrounding citation/link text without downloading their tracking URLs.
+    clone.querySelectorAll('[data-d-component="popover-trigger"][role="button"]').forEach(node=>{
+      if(!node.querySelector('[data-d-component="favicon"]'))return;
+      const links=[...node.querySelectorAll('a[href]')];
+      const label=document.createElement('span');label.textContent=links.length?'':`〔来源：${node.textContent.trim()}〕`;
+      node.replaceWith(label,...links);
+    });
+    clone.querySelectorAll('[data-d-component="favicon"]').forEach(node=>node.remove());
+    clone.querySelectorAll('img').forEach(img=>{
+      const src=img.getAttribute('data-cfb-src')||img.getAttribute('src')||'';
+      const width=Number(img.getAttribute('data-cfb-width')||img.getAttribute('width'));
+      if(/^https:\/\/(?:www\.)?google\.com\/s2\/favicons\?/i.test(src)&&width>0&&width<=32)img.remove();
     });
     // Generated image cards can be wrapped in a clickable button. Preserve the
     // image while discarding the interactive wrapper and its control text.

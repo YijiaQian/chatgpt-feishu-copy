@@ -2,6 +2,65 @@
 (() => {
   'use strict';
   const candidates='.recharts-wrapper,.js-plotly-plot,.vega-embed,[data-chart],[data-testid*="chart"],.chart-container,[role="graphics-document"]';
+  function visualCard(node){
+    const rect=node.getBoundingClientRect();if(rect.width<100||rect.height<40)return false;
+    const style=getComputedStyle(node);
+    const border=['borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth'].some(p=>parseFloat(style[p])>0);
+    const background=style.backgroundColor!=='transparent'&&!/rgba\([^)]*,\s*0\s*\)$/.test(style.backgroundColor);
+    if((border||background&&parseFloat(style.borderRadius)>0)&&node.textContent.trim())return true;
+    // Layout libraries often add one transparent grid-item wrapper per card.
+    return node.children.length===1&&node.firstElementChild.matches('div,section,figure')&&visualCard(node.firstElementChild);
+  }
+  function diagramRoots(root){
+    const nodes=[...root.querySelectorAll('div,section,figure,[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]')].filter(node=>{
+      if(node.closest('pre,code,table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates))return false;
+      const semantic=node.matches('[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]');
+      const layout=/^(?:inline-)?(?:grid|flex)$/.test(getComputedStyle(node).display);
+      if(!semantic&&!layout)return false;
+      const rect=node.getBoundingClientRect();
+      if(rect.width<100||rect.height<45||rect.width*rect.height>8_000_000||node.querySelectorAll('*').length>600)return false;
+      const boxes=node.querySelectorAll('[data-d-component="box"]');
+      const connectors=node.querySelectorAll('svg[data-d-component="icon"]');
+      const bars=node.querySelectorAll('[data-d-has-height][data-d-clip]');
+      const panels=node.querySelectorAll(':scope > [data-d-component="grid-item"],:scope > [data-d-component="box"]');
+      const cards=node.matches('[data-d-component="grid"],[data-d-component="row"]')&&panels.length>=2;
+      const styledCards=layout&&[...node.children].filter(visualCard).length>=2;
+      return styledCards||boxes.length>=2&&(connectors.length>=1||bars.length>=1||cards);
+    });
+    return nodes.filter(node=>!nodes.some(parent=>parent!==node&&parent.contains(node)));
+  }
+  function diagramHTML(node,images=new Map()){
+    const clone=node.cloneNode(true),source=[node,...node.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
+    const properties=['display','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left','border-top','border-right','border-bottom','border-left','border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
+    source.forEach((original,index)=>{
+      const copy=copies[index],style=getComputedStyle(original);
+      copy.removeAttribute('class');copy.removeAttribute('id');copy.removeAttribute('style');
+      if(style.display==='none'||style.visibility==='hidden'||original.matches('button,script,style,iframe,form,input,textarea,.sr-only,[data-cfb-ui],[data-d-component="favicon"]')){copy.remove();return;}
+      for(const property of properties){const value=style.getPropertyValue(property);if(value&&!/url\s*\(/i.test(value))copy.style.setProperty(property,value);}
+      if(original.matches('svg')){const b=original.getBoundingClientRect();copy.setAttribute('width',Math.ceil(b.width));copy.setAttribute('height',Math.ceil(b.height));copy.setAttribute('xmlns','http://www.w3.org/2000/svg');}
+      if(original.matches('img')&&images.has(original)){copy.setAttribute('src',images.get(original));copy.removeAttribute('srcset');}
+    });
+    // Layout snapshots must never introduce new remote resource requests.
+    clone.querySelectorAll('img').forEach(img=>{if(!/^data:image\/(png|jpeg|webp);base64,/i.test(img.getAttribute('src')||''))img.remove();});
+    clone.querySelectorAll('a').forEach(a=>a.removeAttribute('href'));
+    return clone.outerHTML;
+  }
+  async function captureDiagram(node,media){
+    if(!media)throw new Error('布局截图服务未连接，请刷新后重试');
+    const rect=node.getBoundingClientRect();
+    const images=new Map();
+    for(const img of node.querySelectorAll('img')){
+      if(img.closest('[data-d-component="favicon"]')||getComputedStyle(img).visibility==='hidden'||!img.getBoundingClientRect().width)continue;
+      const src=img.currentSrc||img.getAttribute('src')||'';
+      if(/^data:image\/(png|jpeg|webp);base64,/i.test(src))continue;
+      // Preserve real illustrations inside cards. A failed image falls back to
+      // normal conversion with a warning instead of disappearing in a snapshot.
+      if(!src)throw new Error('卡片内图片尚未加载');
+      images.set(img,(await media({src})).dataUrl);
+    }
+    const result=await media({src:diagramHTML(node,images),diagram:true,width:Math.ceil(rect.width),height:Math.ceil(rect.height)});
+    return {dataUrl:result.dataUrl,width:result.displayWidth,height:result.displayHeight,kind:'diagram',alt:'流程图与卡片示意图'};
+  }
   function chartRoots(root){
     const nodes=new Set();
     for(const element of root.querySelectorAll(candidates)){
@@ -75,13 +134,18 @@
     if(canvas.width<1||canvas.height<1||dataUrl.length<100)throw new Error('图表尚未加载，请展开后重试');
     return {dataUrl,width:Math.round(rect.width+padX*2),height:Math.round(rect.height+padY*2)};
   }
-  async function snapshot(root){
+  async function snapshot(root,{media}={}){
     const snapshots=new Map(),warnings=[];
+    for(const node of diagramRoots(root)){
+      try{snapshots.set(node,await captureDiagram(node,media));}
+      catch(error){warnings.push('流程或卡片布局截图失败：'+error.message);}
+    }
     for(const node of chartRoots(root)){
+      if([...snapshots.keys()].some(parent=>parent.contains(node)))continue;
       try{snapshots.set(node,await capture(node));}
       catch(error){warnings.push('交互图表截图失败：'+error.message);}
     }
     return {snapshots,warnings};
   }
-  globalThis.CFBCharts=Object.freeze({chartRoots,svgWithStyles,capture,snapshot});
+  globalThis.CFBCharts=Object.freeze({chartRoots,diagramRoots,diagramHTML,svgWithStyles,capture,captureDiagram,snapshot});
 })();

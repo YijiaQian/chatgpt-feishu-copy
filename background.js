@@ -31,11 +31,11 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   // Content scripts may request media only from the two declared ChatGPT origins.
   if(sender.tab&&!sender.url?.startsWith(chrome.runtime.getURL(''))&&!/^https:\/\/(chatgpt\.com|chat\.openai\.com)\//.test(sender.url||'')){reply({ok:false,error:'来源页面未授权'});return;}
   (async()=>{
-    let {src,svg,width,height,formula,display}=msg.payload||{};
+    let {src,svg,width,height,formula,display,diagram}=msg.payload||{};
     if(typeof src!=='string'||src.length>24*1024*1024)throw new Error('图片数据过大或无效。');
-    if(!svg&&!formula&&!src.startsWith('data:'))src=await fetchImage(src);
+    if(!svg&&!formula&&!diagram&&!src.startsWith('data:'))src=await fetchImage(src);
     await offscreen();
-    const response=await chrome.runtime.sendMessage({target:'offscreen',type:'RASTER',payload:{src,svg,width,height,formula,display}});
+    const response=await chrome.runtime.sendMessage({target:'offscreen',type:'RASTER',payload:{src,svg,width,height,formula,display,diagram}});
     if(!response?.ok)throw new Error(response?.error||'本地图片转换失败。');
     return response;
   })().then(reply).catch(e=>reply({ok:false,error:e.message}));

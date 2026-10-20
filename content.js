@@ -59,7 +59,7 @@
     return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);});
   }
   async function media(payload){
-    if(!payload.svg&&!payload.formula){try{payload={...payload,src:await dataFromURL(payload.src)};}catch{
+    if(!payload.svg&&!payload.formula&&!payload.diagram){try{payload={...payload,src:await dataFromURL(payload.src)};}catch{
       // Same-origin cookie-authenticated and CDN images can be fetched by the worker.
       if(payload.src.startsWith('blob:'))throw new Error('临时图片无法读取，请等待图片加载后重试。');
     }}
@@ -72,14 +72,14 @@
     busy=true;toast('正在转换为飞书格式…');
     try{
       let snapshots=new Map(),chartWarnings=[];
-      if(source.element&&globalThis.CFBCharts){const captured=await CFBCharts.snapshot(source.element);snapshots=captured.snapshots;chartWarnings=captured.warnings;}
+      if(source.element&&globalThis.CFBCharts){const captured=await CFBCharts.snapshot(source.element,{media});snapshots=captured.snapshots;chartWarnings=captured.warnings;}
       const root=source.markdown!==undefined?CFB.parseMarkdown(source.markdown):CFB.cloneAnswer(source.element,{snapshots});
       if(source.element?.querySelector('iframe'))chartWarnings.push('检测到内嵌页面：如果图表在 iframe 内，请先打开图表，再使用图表下载功能插入原图。');
       const result=await CFB.prepare(root,{media,embedImages:settings.embedImages});
-      result.warnings.push(...chartWarnings);result.stats.charts=snapshots.size;
+      result.warnings.push(...chartWarnings);result.stats.charts=[...snapshots.values()].filter(shot=>shot.kind!=='diagram').length;result.stats.diagrams=[...snapshots.values()].filter(shot=>shot.kind==='diagram').length;
       if(!result.text&&!result.stats.images&&!result.stats.icons)throw new Error('没有找到可复制的内容。');
       await CFB.writeClipboard(result);
-      const summary=`已复制飞书格式：${result.stats.formulas} 个公式、${result.stats.images} 张图片、${result.stats.icons} 个图标。`+(snapshots.size?`\n包含 ${snapshots.size} 张交互图表截图。`:'')+(result.stats.tableFormulas?`\n其中 ${result.stats.tableFormulas} 个表格公式以高清图片保留。`:'');
+      const summary=`已复制飞书格式：${result.stats.formulas} 个公式、${result.stats.images} 张图片、${result.stats.icons} 个图标。`+(result.stats.charts?`\n包含 ${result.stats.charts} 张交互图表截图。`:'')+(result.stats.diagrams?`\n保留 ${result.stats.diagrams} 张完整流程或卡片布局。`:'')+(result.stats.tableFormulas?`\n其中 ${result.stats.tableFormulas} 个表格公式以高清图片保留。`:'');
       toast(summary+(result.warnings.length?'\n部分内容需要处理：\n'+result.warnings.join('\n'):'\n现在可在飞书文档中按 Ctrl+V 粘贴。'),result.warnings.length>0);
       await chrome.storage.local.set({lastResult:{time:Date.now(),stats:result.stats,warnings:result.warnings}});
     }catch(error){toast('复制失败：'+error.message+'\n可按住 Alt 再点击原复制按钮，使用原始复制。',true);}

@@ -5,7 +5,7 @@ chrome.storage.local.get({...defaults,lastResult:null}).then(values=>{
     const input=document.getElementById(key);input.checked=values[key];input.addEventListener('change',()=>chrome.storage.local.set({[key]:input.checked}));
   }
   const last=values.lastResult;
-  document.getElementById('last').textContent=last?`上次复制：${last.stats.formulas} 个公式 · ${last.stats.images} 张图片 · ${last.stats.icons} 个图标${last.stats.tableFormulas?'\n其中 '+last.stats.tableFormulas+' 个表格公式以图片保留。':''}${last.warnings.length?'\n注意：'+last.warnings.join('\n'):''}`:'准备就绪 · 内容在本机转换';
+  document.getElementById('last').textContent=last?`上次复制：${last.stats.formulas} 个公式 · ${last.stats.images} 张图片 · ${last.stats.icons} 个图标${last.stats.diagrams?'\n其中 '+last.stats.diagrams+' 张完整流程或卡片布局。':''}${last.stats.tableFormulas?'\n其中 '+last.stats.tableFormulas+' 个表格公式以图片保留。':''}${last.warnings.length?'\n注意：'+last.warnings.join('\n'):''}`:'准备就绪 · 内容在本机转换';
 });
 document.getElementById('open').addEventListener('click',()=>chrome.runtime.openOptionsPage());
 async function pageStatus(repair=false){
