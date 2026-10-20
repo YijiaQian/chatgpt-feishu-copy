@@ -1,6 +1,6 @@
 # Chrome / Edge 商店发布材料
 
-准备日期：2026-10-20；扩展版本：1.2.2。以下是提交草稿，尚未向商店提交审核或通过审核。
+更新日期：2026-10-20；扩展版本：1.2.2。已提交 Chrome 应用商店审核，当前状态为待审核，审核通过后自动公开发布。商品 ID：`lioeeehlohnekghgohhagbammgbbcbfn`。尚未通过审核或正式上架；Edge 尚未提交。
 
 ## 名称与用途
 
@@ -77,6 +77,6 @@
 
 - Chrome：需要开发者账号、账号验证和一次性注册费；具体金额及验证以官方后台显示为准。
 - Edge：需要 Microsoft 个人账号作为主要所有者注册 Partner Center 的 Edge 开发者项目；该项目没有注册费，仍需账号验证。
-- 目前未替用户注册商店账号、付款、接受开发者协议或提交审核。商店会独立审核代码、权限、数据声明和素材，准备完成不等于审核通过。
+- 2026-10-20：在已有 Chrome 开发者条目中撤回旧版 1.1.2 的审核，上传已验证的 1.2.2 商店包，更新介绍、权限理由及测试步骤，重新提交审核，并启用审核通过后自动发布。分发为免费、公开。商店会独立审核代码、权限、数据声明和素材，提交完成不等于审核通过。
 
 官方参考：[Chrome 注册](https://developer.chrome.com/docs/webstore/register/)、[Chrome 打包要求](https://developer.chrome.com/docs/webstore/prepare/)、[Chrome 图片要求](https://developer.chrome.com/docs/webstore/images/)、[Chrome 本地数据披露](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq/)、[Edge 注册](https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/publish/create-dev-account)、[Edge 发布流程](https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/publish-extension)。

@@ -444,7 +444,7 @@ GitHub CI 运行的是本地夹具和打包检查，不会登录 ChatGPT 或飞�
 
 发布流程为：源码检查 → 本地回归 → GitHub CI → 生成包和 SHA-256 → 核对文件 → GitHub Release。商店专用 ZIP 将 `manifest.json` 放在根目录；手动包使用 `chatgpt-feishu-copy` 文件夹，并包含使用和开发文档。商店包不包含测试和开发文件。
 
-Chrome / Edge 商店发布材料见 [商店说明](store-listing.zh-CN.md)。目前尚未提交商店审核。后续遇到 ChatGPT DOM 或飞书导入变化时，应优先复现并补充脱敏夹具，再更新适配器和兼容性记录。
+Chrome / Edge 商店发布材料见 [商店说明](store-listing.zh-CN.md)。v1.2.2 已于 2026-10-20 提交 Chrome 应用商店审核，并启用审核通过后自动公开发布；目前尚未通过审核，Edge 尚未提交。后续遇到 ChatGPT DOM 或飞书导入变化时，应优先复现并补充脱敏夹具，再更新适配器和兼容性记录。
 
 ## 14 技术参考
 
