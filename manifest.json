@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT → 飞书 · 公式图片复制",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "增强 ChatGPT 复制并导出当前会话为离线 HTML，保留飞书兼容的公式、表格、图片和图表。",
   "homepage_url": "https://github.com/YijiaQian/chatgpt-feishu-copy",
   "minimum_chrome_version": "116",

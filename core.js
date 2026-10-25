@@ -307,8 +307,10 @@
   }
   async function writeClipboard(result){
     if(navigator.clipboard?.write&&globalThis.ClipboardItem){
-      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([result.html],{type:'text/html'}),'text/plain':new Blob([result.text],{type:'text/plain'})})]);
-      return;
+      try{
+        await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([result.html],{type:'text/html'}),'text/plain':new Blob([result.text],{type:'text/plain'})})]);
+        return;
+      }catch{/* An available async API can still deny writes; try the copy event. */}
     }
     // Legacy fallback still writes both formats and never overwrites the selection.
     const handler=e=>{e.preventDefault();e.clipboardData.setData('text/html',result.html);e.clipboardData.setData('text/plain',result.text);};

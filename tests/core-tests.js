@@ -6,6 +6,50 @@
   const media=async()=>({dataUrl:png,width:30,height:30,displayWidth:10,displayHeight:10});
   async function check(name,run){try{await run();results.push({name,passed:true});}catch(e){results.push({name,passed:false,error:e.message});}}
   const parse=(text,options={})=>CFB.prepare(CFB.parseMarkdown(text),{media,...options});
+  async function clipboardFixture(run){
+    const clipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+    const execCommand=Object.getOwnPropertyDescriptor(document,'execCommand');
+    try{await run();}finally{
+      if(clipboard)Object.defineProperty(navigator,'clipboard',clipboard);else delete navigator.clipboard;
+      if(execCommand)Object.defineProperty(document,'execCommand',execCommand);else delete document.execCommand;
+    }
+  }
+  await check('异步剪贴板写入 HTML 和纯文本，成功后不触发备用复制',()=>clipboardFixture(async()=>{
+    const result={html:'<p>公式 $x^2$</p>',text:'公式 $x^2$'};let copied,fallbacks=0;
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{write:async items=>{copied=items[0];}}});
+    Object.defineProperty(document,'execCommand',{configurable:true,value:()=>{fallbacks++;return true;}});
+    await CFB.writeClipboard(result);
+    assert(await(await copied.getType('text/html')).text()===result.html,'HTML clipboard payload changed');
+    assert(await(await copied.getType('text/plain')).text()===result.text,'Plain text clipboard payload changed');
+    assert(fallbacks===0,'Successful async write triggered fallback');
+  }));
+  await check('异步剪贴板被拒绝时回退复制，两种格式与当前选区均保留',()=>clipboardFixture(async()=>{
+    const result={html:'<pre><code>    print(1)</code></pre>',text:'    print(1)'};
+    const node=document.createElement('p');node.textContent='保留当前选择';document.body.append(node);
+    const selection=getSelection();selection.setBaseAndExtent(node.firstChild,1,node.firstChild,4);const selected=selection.toString();
+    let copied,fallbacks=0;
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{write:async()=>{throw new DOMException('Denied','NotAllowedError');}}});
+    Object.defineProperty(document,'execCommand',{configurable:true,value:command=>{
+      assert(command==='copy','Unexpected legacy command');fallbacks++;
+      copied=new ClipboardEvent('copy',{clipboardData:new DataTransfer(),cancelable:true});document.dispatchEvent(copied);return copied.defaultPrevented;
+    }});
+    try{
+      await CFB.writeClipboard(result);
+      assert(fallbacks===1,'Rejected async write did not use fallback once');
+      assert(copied.clipboardData.getData('text/html')===result.html&&copied.clipboardData.getData('text/plain')===result.text,'Fallback lost a clipboard format');
+      assert(selection.toString()===selected,'Fallback overwrote current selection');
+      const later=new ClipboardEvent('copy',{clipboardData:new DataTransfer(),cancelable:true});document.dispatchEvent(later);
+      assert(!later.defaultPrevented&&!later.clipboardData.getData('text/html'),'Copy handler leaked after success');
+    }finally{selection.removeAllRanges();node.remove();}
+  }));
+  await check('两种剪贴板写入均失败时明确报错且移除备用事件监听',()=>clipboardFixture(async()=>{
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{write:async()=>{throw new DOMException('Denied','NotAllowedError');}}});
+    Object.defineProperty(document,'execCommand',{configurable:true,value:()=>false});
+    let error;try{await CFB.writeClipboard({html:'<p>private</p>',text:'private'});}catch(e){error=e;}
+    const later=new ClipboardEvent('copy',{clipboardData:new DataTransfer(),cancelable:true});document.dispatchEvent(later);
+    assert(!later.defaultPrevented&&!later.clipboardData.getData('text/plain'),'Failed fallback left a copy handler');
+    assert(error?.message.includes('浏览器阻止了剪贴板写入'),'Clipboard failure did not explain how to retry');
+  }));
   await check('四种公式分隔符及反斜杠不损坏',async()=>{
     const r=await parse(String.raw`\(a_b^2\) 与 $\alpha+\beta$`+'\n\n'+String.raw`\[\frac{a}{b}\]`+'\n\n$$\nx^2\n$$');
     assert(r.stats.formulas===4,JSON.stringify(r.stats));assert(r.html.includes('\\frac{a}{b}'),'LaTeX source lost');assert(!r.warnings.length,'Unexpected warnings');
