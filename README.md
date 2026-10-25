@@ -1,4 +1,4 @@
-# ChatGPT → 飞书 · 公式图片复制 v1.2.2
+# ChatGPT → 飞书 · 公式图片复制 v1.2.3
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -20,7 +20,7 @@
 
 先停用旧版，解压新版，再加载新版的 `chatgpt-feishu-copy` 文件夹，最后刷新 ChatGPT 对话页。若覆盖原文件夹，则在扩展管理页点击该扩展的「重新加载」，再刷新对话页。
 
-新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.2.2；没有连接时点击「检查并启用当前页面」。
+新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.2.3；没有连接时点击「检查并启用当前页面」。
 
 已用实际 ChatGPT 对话中的自带复制按钮验证：35 个公式、2 张原始 Recharts 曲线图和 4 个表格公式图片进入剪贴板，粘贴到真实飞书文档后保存为 31 个原生公式和 6 个图片块。
 
@@ -34,7 +34,7 @@
 4. 选择包含 `manifest.json` 的文件夹。
 5. 刷新 ChatGPT 网页，可以将扩展固定到浏览器工具栏。
 
-v1.2.2 已于 2026-10-20 提交 Chrome 应用商店审核，审核通过后自动公开发布，目前尚未正式上架。已在独立测试浏览器加载。`manual.zip` 用于手动安装；`store.zip` 用于商店后台上传，其 manifest 位于 ZIP 根目录。
+v1.2.2 已于 2026-10-20 提交 Chrome 应用商店审核，审核通过后自动公开发布，目前尚未正式上架。v1.2.3 为后续开发版本，未提交商店审核。`manual.zip` 用于手动安装；`store.zip` 用于商店后台上传，其 manifest 位于 ZIP 根目录。
 
 ## 使用
 
