@@ -1,11 +1,11 @@
-# ChatGPT → 飞书 · 公式图片复制 v1.2.4
+# ChatGPT 飞书复制助手 v1.2.5
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 把 ChatGPT 回复中的 Markdown、LaTeX、表格、图片和可读取的图表，转换成适合飞书文档粘贴的富文本。支持增强原生复制按钮、整段会话导出到本地，以及独立 Markdown 转换工具。无需 API Key 或飞书应用凭据。
 
-这是独立开源工具，与 OpenAI、飞书、Google 或 Microsoft 没有隶属或官方合作关系。当前提供手动安装包；尚未上架 Chrome 或 Edge 插件市场。
+这是独立开源工具，与 OpenAI、飞书、Google 或 Microsoft 没有隶属或官方合作关系。已上架 [Chrome 应用商店](https://chromewebstore.google.com/detail/lioeeehlohnekghgohhagbammgbbcbfn)，也提供手动安装包；Edge 商店尚未提交。
 
 - [下载最新版本](https://github.com/YijiaQian/chatgpt-feishu-copy/releases/latest)
 - [隐私说明](https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/PRIVACY.md)
@@ -14,13 +14,13 @@
 - [产品需求文档与架构流程图](docs/PRD.zh-CN.md)
 - [整段会话离线导出设计与验收](docs/conversation-export.zh-CN.md)
 
-![独立 Markdown 转换工具](docs/assets/converter-1280x800.png)
+![独立 Markdown 转换工具与公开测试内容](docs/assets/store/05-markdown.png)
 
 ## 从旧版更新
 
 先停用旧版，解压新版，再加载新版的 `chatgpt-feishu-copy` 文件夹，最后刷新 ChatGPT 对话页。若覆盖原文件夹，则在扩展管理页点击该扩展的「重新加载」，再刷新对话页。
 
-新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.2.4；没有连接时点击「检查并启用当前页面」。
+新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.2.5；没有连接时点击「检查并启用当前页面」。
 
 已用实际 ChatGPT 对话中的自带复制按钮验证：35 个公式、2 张原始 Recharts 曲线图和 4 个表格公式图片进入剪贴板，粘贴到真实飞书文档后保存为 31 个原生公式和 6 个图片块。
 
@@ -34,7 +34,7 @@
 4. 选择包含 `manifest.json` 的文件夹。
 5. 刷新 ChatGPT 网页，可以将扩展固定到浏览器工具栏。
 
-v1.2.2 于 2026-10-20 提交 Chrome 应用商店审核，保留该历史提交记录。v1.2.4 为后续开发版本，本次不自动上传商店或替换商店版本。`manual.zip` 用于手动安装；`store.zip` 用于商店后台上传，其 manifest 位于 ZIP 根目录。
+v1.2.2 于 2026-10-20 提交 Chrome 应用商店审核，2026-10-29 核实已公开上架。v1.2.5 更名为“ChatGPT 飞书复制助手”，沿用同一个商店条目，并更新中文介绍与公开示例截图；已于 2026-10-29 提交审核，后台显示“待审核”，审核通过后自动发布。详见 [本次商店更新记录](docs/store-update-v1.2.5.zh-CN.md)。`manual.zip` 用于手动安装；`store.zip` 用于商店后台上传，其 manifest 位于 ZIP 根目录。上传、提审和审核通过是不同阶段，以商店后台状态为准。
 
 ## 使用
 
