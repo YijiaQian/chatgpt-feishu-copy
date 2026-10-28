@@ -1,4 +1,5 @@
 'use strict';
+document.getElementById('extension-version').textContent='CHATGPT → FEISHU · '+chrome.runtime.getManifest().version;
 const defaults={enabled:true,embedImages:true,markdownCode:true};
 chrome.storage.local.get({...defaults,lastResult:null}).then(values=>{
   for(const key of Object.keys(defaults)){

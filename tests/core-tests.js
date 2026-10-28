@@ -6,6 +6,20 @@
   const media=async()=>({dataUrl:png,width:30,height:30,displayWidth:10,displayHeight:10});
   async function check(name,run){try{await run();results.push({name,passed:true});}catch(e){results.push({name,passed:false,error:e.message});}}
   const parse=(text,options={})=>CFB.prepare(CFB.parseMarkdown(text),{media,...options});
+  await check('组件用普通段落写出的连续编号形成独立列表',async()=>{
+    const result=await CFB.prepare('<ol><li>earlier</li></ol><h2>Next</h2><p><strong>1. First step.</strong> Details.</p><p><strong>2. Second step.</strong> More.</p><p>3. Third step.</p><h2>Prose</h2><p>1. Isolated numbered paragraph.</p><table><tr><td><p>1. Cell</p><p>2. Cell</p></td></tr></table>',{media});
+    const root=document.createElement('div');root.innerHTML=result.html;const lists=root.querySelectorAll('ol');
+    assert(lists.length===2&&lists[1].start===1&&lists[1].children.length===3,'Numbered paragraph group not bounded');assert(lists[1].querySelector('strong').textContent==='First step.','Number removed with formatting lost');assert(root.textContent.includes('1. Isolated')&&root.querySelector('td').textContent.includes('1. Cell'),'Unrelated paragraphs converted');
+  });
+  await check('图标加正文说明保持可编辑，不误判为整行图表',async()=>{
+    const root=document.createElement('div');root.innerHTML='<div data-d-component="row" style="display:flex;width:500px;height:90px"><div data-d-component="box"><svg data-d-component="icon" width="20" height="20"></svg></div><div data-d-component="box"><p>说明标题</p><p>较长的说明正文保留为文字，可以自动换行。</p></div></div>';document.body.append(root);
+    try{assert(CFBCharts.diagramRoots(root).length===0,'Icon and prose misidentified as diagram');const result=await CFB.prepare(CFB.cloneAnswer(root),{media});assert(result.html.includes('说明正文')&&result.html.includes('<p'),'Explanatory prose lost');}finally{root.remove();}
+  });
+  await check('独立有序列表显式重置编号并保留自定义起点',async()=>{
+    const result=await parse('1. first\n2. second\n\n## next\n\n1. new first\n2. new second\n\n## continued\n\n5. fifth');
+    const root=document.createElement('div');root.innerHTML=result.html;
+    assert([...root.querySelectorAll('ol')].map(e=>e.getAttribute('start')).join(',')==='1,1,5','List restarts or explicit starting number lost');
+  });
   async function clipboardFixture(run){
     const clipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');
     const execCommand=Object.getOwnPropertyDescriptor(document,'execCommand');
@@ -100,9 +114,47 @@
   await check('超长文本明确拒绝',async()=>{
     let failed=false;try{CFB.parseMarkdown('x'.repeat(2_000_001));}catch{failed=true;}assert(failed,'Oversized text accepted');
   });
+  await check('新版强调 span 与标准行内样式进入飞书 HTML',async()=>{
+    const r=await CFB.prepare('<p>普通 <span data-d-default-strong>重点</span> <em>倾斜</em> <del>删除</del></p><pre><code><span data-d-default-strong>源码</span></code></pre>',{media});
+    const box=document.createElement('div');box.innerHTML=r.html;
+    assert(box.querySelector('p strong')?.textContent==='重点','Modern emphasis was lost');
+    assert(box.querySelector('strong').style.fontWeight==='700'&&box.querySelector('em').style.fontStyle==='italic','Importer styles missing');
+    assert(!box.querySelector('pre strong'),'Code was reformatted');
+  });
+  await check('表格给出可用列宽，源表格的列宽比例与合并单元格保留',async()=>{
+    const element=document.createElement('div');element.innerHTML='<table style="width:600px;table-layout:fixed"><colgroup><col style="width:200px"><col style="width:400px"></colgroup><tr><th>字段</th><th>详细说明</th></tr><tr><td colspan="2">合并</td></tr></table>';document.body.append(element);
+    try{
+      const r=await CFB.prepare(CFB.cloneAnswer(element),{media}),box=document.createElement('div');box.innerHTML=r.html;
+      const cols=[...box.querySelectorAll('col')].map(c=>Number(c.width));
+      assert(cols.length===2&&Math.abs(cols[1]/cols[0]-2)<0.05,'Measured proportions were lost');
+      assert(cols.reduce((a,b)=>a+b,0)===720&&box.querySelector('[colspan="2"]'),'Table width or merged cell lost');
+      const markdown=await parse('| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |');
+      box.innerHTML=markdown.html;assert([...box.querySelectorAll('col')].every(c=>Number(c.width)===240),'Markdown table fell back to narrow columns');
+    }finally{element.remove();}
+  });
+  await check('内联可点击词条保留文字，实际复制按钮仍被移除',async()=>{
+    const element=document.createElement('div');element.innerHTML='<p>查看<span data-d-component="pressable" data-d-inline role="button"><span>示例词条</span></span>说明</p><button>复制</button>';document.body.append(element);
+    try{const r=await CFB.prepare(CFB.cloneAnswer(element),{media});assert(r.text==='查看示例词条说明','Inline prose disappeared');assert(!r.html.includes('<button'),'Toolbar survived');}finally{element.remove();}
+  });
+  await check('交互计算器整块快照保留选中项、滑块位置和金额，正文标题不进入图片',async()=>{
+    const element=document.createElement('div');element.style.width='600px';element.innerHTML='<h2>正文标题</h2><div data-d-component="box" data-d-has-border style="border:1px solid #ddd;padding:12px;display:flex;flex-direction:column"><p>费用计算</p><div data-d-component="radio-group"><label><button role="radio" aria-checked="false" style="width:16px;height:16px"></button>方案A</label><label><button role="radio" aria-checked="true" style="width:16px;height:16px"></button>方案B</label></div><div data-d-component="slider" style="height:16px;position:relative"><span role="slider" aria-valuenow="60" style="position:absolute;left:40%;width:12px;height:12px;transform:translateX(-50%);background:#ccc"></span></div><h3>¥108</h3></div><p>结尾说明</p>';document.body.append(element);
+    try{
+      const roots=CFBCharts.diagramRoots(element);assert(roots.length===1&&roots[0]===element.children[1],'Calculator snapshot included prose or was not selected');
+      const html=CFBCharts.diagramHTML(roots[0]),box=document.createElement('div');box.innerHTML=html;
+      assert(html.includes('●')&&html.includes('○')&&!box.querySelector('button'),'Selected option was not frozen');
+      const slider=box.querySelector('[role="slider"]');assert(slider.style.position==='absolute'&&slider.style.left&&slider.style.transform,'Slider position was flattened');
+      assert(box.textContent.includes('¥108')&&!box.textContent.includes('正文标题'),'Amount or capture boundary wrong');
+      const captured=new Map([[roots[0],{dataUrl:png,width:600,height:200}]]),result=await CFB.prepare(CFB.cloneAnswer(element,{snapshots:captured}),{media});
+      assert(result.html.includes('正文标题')&&result.html.includes('结尾说明')&&!result.html.includes('¥108'),'Calculator leaked a heading into the document outline');
+    }finally{element.remove();}
+  });
   await check('纯 Markdown 缺失 Chart 数据时明确提示',async()=>{
     const r=await parse('## 图表\n\nChart\n\n原始 rA / Clip 后的 rA / 最终 L = min');
     assert(r.warnings.some(w=>w.includes('没有图表数据')),'Missing chart data silently accepted');
+  });
+  await check('带指标网格的费用卡片完整截图，金额不泄漏到正文目录',async()=>{
+    const root=document.createElement('div');root.innerHTML='<h2>费用说明</h2><div data-d-component="box" data-d-has-border style="width:500px;border:1px solid #ccc"><p>费用摘要</p><div data-d-component="grid" style="display:grid;grid-template-columns:1fr 1fr"><div data-d-component="grid-item"><div data-d-component="box">40 条</div></div><div data-d-component="grid-item"><div data-d-component="box">3 次</div></div></div><p>合计 120 次</p><h1>¥11.12/月</h1></div><p>正文结尾</p>';document.body.append(root);
+    try{const found=CFBCharts.diagramRoots(root);assert(found.length===1&&found[0]===root.children[1],'Summary card split into grid and headings');assert(CFBCharts.diagramHTML(found[0]).includes('¥11.12/月'),'Summary amount lost');}finally{root.remove();}
   });
   await check('交互 SVG 曲线图截图保留颜色与曲线',async()=>{
     const root=document.createElement('div');root.style.cssText='width:320px;height:180px;position:relative;background:white';

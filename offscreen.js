@@ -29,11 +29,21 @@ async function raster({src,svg,formula,display,diagram,width,height}){
   let blob;
   if(svg){
     const safe=DOMPurify.sanitize(src,{USE_PROFILES:{svg:true},FORBID_TAGS:['foreignObject','image','script','style','a','use'],FORBID_ATTR:['href','xlink:href']});
-    blob=new Blob([safe],{type:'image/svg+xml;charset=utf-8'});
+    const doc=new DOMParser().parseFromString(safe,'image/svg+xml'),vector=doc.documentElement;
+    if(vector.localName!=='svg'||doc.querySelector('parsererror'))throw new Error('SVG 内容无效。');
+    // Percentage-sized SVG images otherwise decode at a tiny default size.
+    // Rasterize at twice their measured display size, within the image budget.
+    if(Number.isFinite(width)&&Number.isFinite(height)&&width>0&&height>0){
+      const scale=Math.min(width>64||height>64?2:1,2000/width,Math.sqrt(8_000_000/(width*height)));
+      const w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale));
+      vector.setAttribute('width',String(w));vector.setAttribute('height',String(h));
+      vector.style.width=w+'px';vector.style.height=h+'px';
+    }
+    blob=new Blob([new XMLSerializer().serializeToString(vector)],{type:'image/svg+xml;charset=utf-8'});
   }else{
     if(!/^data:image\/(png|jpeg|jpg|gif|webp|avif|bmp|svg\+xml)(?:;|,)/i.test(src))throw new Error('图片类型不受支持。');
     const response=await fetch(src);blob=await response.blob();
-    if(blob.type.includes('svg'))return raster({src:await blob.text(),svg:true});
+    if(blob.type.includes('svg'))return raster({src:await blob.text(),svg:true,width,height});
   }
   const url=URL.createObjectURL(blob);
   try{

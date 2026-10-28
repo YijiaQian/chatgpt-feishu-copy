@@ -18,7 +18,7 @@ try:
     with sync_playwright() as p:
         browser=p.chromium.launch(headless=True,**({'executable_path':args.browser} if args.browser else {}))
         page=browser.new_page();results=[]
-        for suite in ['core-tests.html','conversation-tests.html']:
+        for suite in ['core-tests.html','conversation-tests.html','offscreen-tests.html']:
             page.goto(f'http://127.0.0.1:{server.server_port}/tests/{suite}')
             page.wait_for_function('()=>Array.isArray(window.TEST_RESULTS)',timeout=60000)
             results.extend(page.evaluate('TEST_RESULTS'))
