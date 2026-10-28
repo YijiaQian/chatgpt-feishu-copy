@@ -115,11 +115,55 @@
   }
   function isDisplay(node){return node.getAttribute('data-display')==='true'||node.matches('.katex-display,[display="block"],[display="true"]')||node.classList.contains('math-display')||Boolean(node.querySelector('.katex-display,math[display="block"]'));}
 
+  function normalizeFormatting(root){
+    // The current renderer uses spans instead of semantic strong elements.
+    for(const node of root.querySelectorAll('[data-d-default-strong]')){
+      if(node.closest('pre,code,strong,b'))continue;
+      const strong=document.createElement('strong');strong.append(...node.childNodes);node.append(strong);
+    }
+  }
+  function normalizeNumberedParagraphs(root){
+    // Some ChatGPT components render numbered steps as plain paragraphs.
+    // Give consecutive steps an explicit list boundary before Feishu imports them.
+    const number=node=>node?.matches('p')&&!node.closest('li,table,pre,code')?node.textContent.match(/^(\d+)\.\s+/):null;
+    for(const first of [...root.querySelectorAll('p')]){
+      const initial=number(first);if(!initial||!first.parentNode)continue;
+      const items=[first];let next=first.nextElementSibling,expected=Number(initial[1])+1;
+      while(number(next)&&Number(number(next)[1])===expected){items.push(next);next=next.nextElementSibling;expected++;}
+      if(items.length<2)continue;
+      const list=document.createElement('ol');list.start=Number(initial[1]);first.before(list);
+      for(const item of items){
+        let remaining=number(item)[0].length;
+        const walker=document.createTreeWalker(item,NodeFilter.SHOW_TEXT);let text;
+        while(remaining&&(text=walker.nextNode())){const count=Math.min(remaining,text.length);text.deleteData(0,count);remaining-=count;}
+        const li=document.createElement('li');li.append(item);list.append(li);
+      }
+    }
+  }
+  function normalizeTables(root){
+    for(const table of root.querySelectorAll('table')){
+      const columns=Math.max(0,...[...table.rows].filter(row=>row.closest('table')===table).map(row=>[...row.cells].reduce((n,cell)=>n+(cell.colSpan||1),0)));
+      if(!columns)continue;
+      let widths=[];
+      try{widths=JSON.parse(table.getAttribute('data-cfb-col-widths')||'[]');}catch{/* Fall back to existing columns. */}
+      if(!Array.isArray(widths)||widths.length!==columns||!widths.every(w=>Number.isFinite(w)&&w>0))widths=[...table.querySelectorAll(':scope > colgroup > col')].flatMap(col=>Array.from({length:col.span||1},()=>Number(col.getAttribute('width'))));
+      if(widths.length!==columns||!widths.every(w=>Number.isFinite(w)&&w>0))widths=Array(columns).fill(1);
+      const total=widths.reduce((a,b)=>a+b,0),group=document.createElement('colgroup');
+      for(const value of widths){const col=document.createElement('col');col.width=String(Math.max(1,Math.round(720*value/total)));group.append(col);}
+      table.querySelectorAll(':scope > colgroup').forEach(group=>group.remove());table.prepend(group);table.setAttribute('width','720');
+    }
+  }
+
   function cloneAnswer(source,{snapshots=new Map()}={}) {
     const clone=source.cloneNode(true);
     const srcNodes=[source,...source.querySelectorAll('*')], dstNodes=[clone,...clone.querySelectorAll('*')];
     srcNodes.forEach((node,i)=>{
       const copy=dstNodes[i];
+      if(node.matches('table')){
+        const row=[...node.rows].find(row=>row.closest('table')===node);
+        const widths=row?[...row.cells].flatMap(cell=>Array.from({length:cell.colSpan||1},()=>cell.getBoundingClientRect().width/(cell.colSpan||1))):[];
+        if(widths.length&&widths.every(w=>w>0))copy.setAttribute('data-cfb-col-widths',JSON.stringify(widths));
+      }
       if(snapshots.has(node)){
         const shot=snapshots.get(node),img=document.createElement('img');img.src=shot.dataUrl;img.alt=shot.alt||'交互曲线图';
         img.setAttribute('data-cfb-width',String(shot.width));img.setAttribute('data-cfb-height',String(shot.height));
@@ -166,6 +210,8 @@
       node.replaceWith(label,...links);
     });
     clone.querySelectorAll('[data-d-component="favicon"]').forEach(node=>node.remove());
+    // Inline word popovers are prose, even when the site exposes them as buttons.
+    clone.querySelectorAll('[data-d-component="pressable"][data-d-inline][role="button"]').forEach(node=>node.replaceWith(...node.childNodes));
     clone.querySelectorAll('img').forEach(img=>{
       const src=img.getAttribute('data-cfb-src')||img.getAttribute('src')||'';
       const width=Number(img.getAttribute('data-cfb-width')||img.getAttribute('width'));
@@ -195,7 +241,7 @@
     return walk(root).replace(/\n{3,}/g,'\n\n').trim();
   }
   function decorate(root){
-    const styles={P:'margin:0 0 10px;line-height:1.7',H1:'font-size:28px;font-weight:700;margin:20px 0 12px',H2:'font-size:24px;font-weight:700;margin:18px 0 10px',H3:'font-size:20px;font-weight:700;margin:16px 0 8px',H4:'font-size:18px;font-weight:700',PRE:'white-space:pre-wrap;background:#f5f6f7;padding:12px;font-family:Consolas,monospace',CODE:'font-family:Consolas,monospace',TABLE:'border-collapse:collapse;margin:12px 0',TH:'border:1px solid #c9cdd4;padding:8px;background:#f5f6f7;font-weight:700',TD:'border:1px solid #c9cdd4;padding:8px',BLOCKQUOTE:'border-left:3px solid #3370ff;margin:12px 0;padding-left:12px;color:#4e5969',UL:'padding-left:24px',OL:'padding-left:24px',A:'color:#1456f0;text-decoration:underline'};
+    const styles={P:'margin:0 0 10px;line-height:1.7',STRONG:'font-weight:700',B:'font-weight:700',EM:'font-style:italic',I:'font-style:italic',U:'text-decoration:underline',S:'text-decoration:line-through',DEL:'text-decoration:line-through',H1:'font-size:28px;font-weight:700;margin:20px 0 12px',H2:'font-size:24px;font-weight:700;margin:18px 0 10px',H3:'font-size:20px;font-weight:700;margin:16px 0 8px',H4:'font-size:18px;font-weight:700',PRE:'white-space:pre-wrap;background:#f5f6f7;padding:12px;font-family:Consolas,monospace',CODE:'font-family:Consolas,monospace',TABLE:'border-collapse:collapse;margin:12px 0;width:720px;max-width:100%',TH:'border:1px solid #c9cdd4;padding:8px;background:#f5f6f7;font-weight:700',TD:'border:1px solid #c9cdd4;padding:8px',BLOCKQUOTE:'border-left:3px solid #3370ff;margin:12px 0;padding-left:12px;color:#4e5969',UL:'padding-left:24px',OL:'padding-left:24px',A:'color:#1456f0;text-decoration:underline'};
     for(const node of root.querySelectorAll('*')){
       const tag=node.tagName;
       if(tag==='IMG')continue;
@@ -203,6 +249,9 @@
       const align=node.getAttribute('align');
       node.removeAttribute('style');
       if(styles[tag])node.style.cssText=styles[tag];
+      // Feishu otherwise continues numbering from an earlier, separate list.
+      if(tag==='OL'&&!node.hasAttribute('start'))node.setAttribute('start','1');
+      if(tag==='COL'&&/^\d+$/.test(node.getAttribute('width')||''))node.style.width=node.getAttribute('width')+'px';
       if(['left','center','right'].includes(align))node.style.textAlign=align;
       for(const attr of [...node.attributes])if(!['href','src','alt','title','width','height','colspan','rowspan','start','style','checked','type'].includes(attr.name))node.removeAttribute(attr.name);
       // Feishu's HTML importer uses ace-table to distinguish native document tables
@@ -215,6 +264,7 @@
   async function prepare(input,{media,embedImages=true}={}){
     const root=document.createElement('div');root.innerHTML=cleanHTML(input.outerHTML||input);
     normalizeCodeBlocks(root);
+    normalizeFormatting(root);normalizeTables(root);normalizeNumberedParagraphs(root);
     const warnings=[],stats={formulas:0,images:0,icons:0,tableFormulas:0};
     if(/(?:^|\n)\s*Chart\s*(?:\n|$)/.test(root.innerText||root.textContent)&&!root.querySelector('svg,canvas,img'))warnings.push('文本里只有 Chart 占位符，没有图表数据。Markdown 无法还原原图；请从原始网页复制，或插入图表图片。');
     // Text-only equations also occur in raw HTML tables and unrendered answers.

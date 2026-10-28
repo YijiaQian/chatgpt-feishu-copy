@@ -18,6 +18,8 @@
     const nodes=[...root.querySelectorAll('div,section,figure,[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]')].filter(node=>{
       if(node.matches(messageContainers)||node.closest(codeContainers+',table,button,.katex,[data-cfb-ui]')||node.querySelector(candidates+',pre,[data-code-block]'))return false;
       const semantic=node.matches('[data-d-component="box"][data-d-has-border],[data-d-component="row"],[data-d-component="grid"]');
+      const widget=node.matches('[data-d-component="box"][data-d-has-border]')&&node.querySelector('[data-d-component="radio-group"],[data-d-component="slider"]');
+      const summary=node.matches('[data-d-component="box"][data-d-has-border]')&&node.querySelector(':scope > [data-d-component="grid"]')&&!node.querySelector('table');
       const layout=/^(?:inline-)?(?:grid|flex)$/.test(getComputedStyle(node).display);
       if(!semantic&&!layout)return false;
       const rect=node.getBoundingClientRect();
@@ -30,8 +32,11 @@
       // A prose renderer can itself be flex/grid and contain diagrams anywhere
       // below it. Only a tight group of direct card panels qualifies here.
       const children=[...node.children].filter(e=>getComputedStyle(e).display!=='none'&&!e.matches('[data-cfb-ui],script,style'));
+      // An icon beside one prose panel is explanatory text, not a diagram.
+      // Keep it editable instead of rasterizing long lines into a tight image.
+      if(node.matches('[data-d-component="row"]')&&children.length===2&&children.filter(e=>e.textContent.trim()).length===1&&children.some(e=>!e.textContent.trim()&&e.querySelector('svg[data-d-component="icon"]')&&!e.querySelector('img')))return false;
       const styledCards=layout&&children.length>=2&&children.every(e=>visualCard(e))&&[...node.childNodes].every(n=>n.nodeType!==Node.TEXT_NODE||!n.textContent.trim());
-      return styledCards||semantic&&boxes.length>=2&&(connectors.length>=1||bars.length>=1||cards);
+      return Boolean(widget||summary)||styledCards||semantic&&boxes.length>=2&&(connectors.length>=1||bars.length>=1||cards);
     });
     return nodes.filter(node=>!nodes.some(parent=>parent!==node&&parent.contains(node)));
   }
@@ -43,9 +48,17 @@
   }
   function diagramHTML(node,images=new Map(),formulas=new Map()){
     const clone=node.cloneNode(true),source=[node,...node.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
-    const properties=['display','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`)),'border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
+    const properties=['display','position','top','right','bottom','left','transform','transform-origin','overflow','box-sizing','width','height','min-width','min-height','max-width','max-height','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis','align-items','align-self','justify-content','gap','row-gap','column-gap','grid-template-columns','grid-template-rows','grid-column','grid-row','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`)),'border-radius','background-color','color','font-family','font-size','font-weight','font-style','line-height','text-align','letter-spacing','white-space','word-break','overflow-wrap','vertical-align','opacity','fill','stroke','stroke-width','fill-rule'];
     source.forEach((original,index)=>{
       const copy=copies[index],style=getComputedStyle(original);
+      if(original.matches('button[role="radio"]')){
+        // A static snapshot carries the selected option without live controls or
+        // CSS pseudo-elements, which are absent in the isolated renderer.
+        const radio=document.createElement('span'),rect=original.getBoundingClientRect();
+        radio.textContent=original.getAttribute('aria-checked')==='true'?'●':'○';
+        radio.style.cssText=`display:inline-flex;align-items:center;justify-content:center;width:${rect.width}px;height:${rect.height}px;font-size:${Math.max(12,rect.height)}px;color:${legacyColor(style.color)};line-height:1`;
+        copy.replaceWith(radio);return;
+      }
       if(formulas.has(original)){
         const formula=formulas.get(original),img=document.createElement('img');
         img.src=formula.dataUrl;img.alt=formula.tex;img.width=formula.width;img.height=formula.height;

@@ -45,7 +45,7 @@
 | offscreen | 在本机后台 DOM 中渲染表格公式、解码图片并生成 PNG。 |
 | scripting | 用户在弹窗主动点击“检查并启用当前页面”后，向已授权的 ChatGPT 页面重新注入扩展文件。 |
 | chatgpt.com、chat.openai.com | 读取待复制回复、连接当前页面并在必要时下载该页面的同源图片。 |
-| *.oaiusercontent.com、*.oaistatic.com | 下载回复引用的 OpenAI 图片素材；不是执行远程代码。 |
+| *.oaiusercontent.com、*.oaistatic.com、images.openai.com | 下载回复引用的 OpenAI 图片素材，包括搜索结果卡片缩略图；不是执行远程代码。 |
 | 可选 https://*/* | 仅为用户手动输入并授权的单个外部图片域名下载图片。不会默认申请访问所有 HTTPS 网站，不会向其他网站注入内容脚本。 |
 
 远程代码：不使用。Markdown、净化、公式和截图依赖均随扩展本地打包。远程请求只用于用户引用的图片，不下载或执行脚本。
