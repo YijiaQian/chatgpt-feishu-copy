@@ -1,6 +1,6 @@
 # 隐私说明
 
-更新日期：2026-10-20。本说明适用于 Microsoft Edge 和 Google Chrome 中的「ChatGPT → 飞书 · 公式图片复制」扩展。
+更新日期：2026-10-20。本说明适用于 Microsoft Edge 和 Google Chrome 中的「ChatGPT 飞书复制助手」扩展。
 
 
 ## 处理哪些内容
