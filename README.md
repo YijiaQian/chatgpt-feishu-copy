@@ -1,4 +1,4 @@
-# ChatGPT 飞书复制助手 v1.2.6（开发中）
+# ChatGPT 飞书复制助手 v1.2.6
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -30,7 +30,7 @@
 4. 选择包含 `manifest.json` 的文件夹。
 5. 刷新 ChatGPT 网页，可以将扩展固定到浏览器工具栏。
 
-本分支是尚未发布的 v1.2.6 维护试点。商店上架与审核的历史状态见 [v1.2.5 商店更新记录](docs/store-update-v1.2.5.zh-CN.md)，当前结果以商店后台为准。GitHub Release 只提供手动加载的 `manual.zip` 及对应校验值；`store.zip` 仅用于本地商店上传，其 manifest 位于 ZIP 根目录。
+v1.2.6 是文档与开发维护工具更新，转换行为和浏览器权限保持不变。该版通过 GitHub 手动安装包分发，未向应用商店提审。商店上架与审核的历史状态见 [v1.2.5 商店更新记录](docs/store-update-v1.2.5.zh-CN.md)，当前结果以商店后台为准。GitHub Release 只提供手动加载的 `manual.zip` 及对应校验值；`store.zip` 仅用于本地商店上传，其 manifest 位于 ZIP 根目录。
 
 ## 使用
 
