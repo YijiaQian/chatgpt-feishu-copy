@@ -1,0 +1,15 @@
+{
+  "globs": ["*.md", "docs/**/*.md", ".agents/**/*.md", "scripts/AGENTS.md", ".github/AGENTS.md"],
+  "ignores": [".agents/notes/archived/**"],
+  "config": {
+    "default": false,
+    "MD001": true,
+    "MD009": true,
+    "MD010": true,
+    "MD012": true,
+    "MD022": true,
+    "MD031": true,
+    "MD032": true,
+    "MD040": true
+  }
+}

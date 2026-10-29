@@ -1,0 +1,16 @@
+{
+  "name": "chatgpt-feishu-copy-development",
+  "private": true,
+  "scripts": {
+    "lint:md": "markdownlint-cli2",
+    "lint:md:fix": "markdownlint-cli2 --fix"
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "0.24.0"
+  },
+  "overrides": {
+    "katex": "0.19.1",
+    "re2js": "2.8.7"
+  },
+  "engines": { "node": ">=22.12" }
+}

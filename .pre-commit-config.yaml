@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: maintenance-index
+        name: Check staged documentation, notes and Python
+        entry: python -X utf8 scripts/staged_checks.py
+        language: system
+        pass_filenames: false
+        always_run: true
