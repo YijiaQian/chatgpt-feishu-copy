@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT 飞书复制助手",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "一键将 ChatGPT 内容复制到飞书文档，保留公式、表格、图片与代码块，支持整段会话离线导出。",
   "homepage_url": "https://github.com/YijiaQian/chatgpt-feishu-copy",
   "minimum_chrome_version": "116",

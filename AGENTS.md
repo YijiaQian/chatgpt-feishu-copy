@@ -7,6 +7,12 @@
 - 打包：`python scripts/package.py`，产物位于 `dist/`。提交前完成测试和打包，并检查变更的 JavaScript 语法。
 - 首次运行测试需安装 Playwright 和 Chromium，具体步骤及手动验收清单见 `CONTRIBUTING.md`。
 
+## 文档与维护检查
+
+- 文档归属与导航见 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/README.md](docs/README.md)。维护文档、文字或长期设计理由时，按需使用 [.agents 中的三个技能](.agents/README.md) 及其引用；保留事实、失败条件与验证缺口。
+- 静态检查运行 `python -X utf8 scripts/check_maintenance.py`；维护工具行为测试运行 `python -X utf8 -m unittest discover -s scripts/tests -v`。依赖准备、可选只读 hook 与检查边界见 `CONTRIBUTING.md` 和 `docs/maintenance.zh-CN.md`。
+- 临时计划与原始运行输出放入被忽略的 `work/`，不要追加到当前使用说明。长期决策才进入 `.agents/notes/`。
+
 ## 飞书格式参考
 
 - 需要核对飞书粘贴、公式、表格、代码块或图片格式细节时，先查阅 `G:\project\chatgpt-feishu-copy-reference` 中的参考代码与验收材料。

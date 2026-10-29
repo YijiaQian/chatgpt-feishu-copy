@@ -1,4 +1,4 @@
-# ChatGPT 飞书复制助手 v1.2.5
+# ChatGPT 飞书复制助手 v1.2.6（开发中）
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -10,7 +10,7 @@
 - [下载最新版本](https://github.com/YijiaQian/chatgpt-feishu-copy/releases/latest)
 - [隐私说明](https://github.com/YijiaQian/chatgpt-feishu-copy/blob/main/PRIVACY.md)
 - [报告问题](https://github.com/YijiaQian/chatgpt-feishu-copy/issues)
-- [参与开发](CONTRIBUTING.md) · [商店发布材料](docs/store-listing.zh-CN.md)
+- [参与开发](CONTRIBUTING.md) · [文档导航](docs/README.md) · [商店发布材料](docs/store-listing.zh-CN.md)
 - [产品需求文档与架构流程图](docs/PRD.zh-CN.md)
 - [整段会话离线导出设计与验收](docs/conversation-export.zh-CN.md)
 
@@ -20,11 +20,7 @@
 
 先停用旧版，解压新版，再加载新版的 `chatgpt-feishu-copy` 文件夹，最后刷新 ChatGPT 对话页。若覆盖原文件夹，则在扩展管理页点击该扩展的「重新加载」，再刷新对话页。
 
-新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接 v1.2.5；没有连接时点击「检查并启用当前页面」。
-
-已用实际 ChatGPT 对话中的自带复制按钮验证：35 个公式、2 张原始 Recharts 曲线图和 4 个表格公式图片进入剪贴板，粘贴到真实飞书文档后保存为 31 个原生公式和 6 个图片块。
-
-本地运行的 Chrome / Edge 浏览器扩展。点击 ChatGPT 回复下方原有的复制按钮，生成适合飞书文档粘贴的富文本。无需 API Key、飞书 App Secret 或服务器。
+新版支持当前 ChatGPT 的 `data-turn-key` / `assistant-message` 消息结构。回复工具栏中会出现文档导出图标，悬停显示「复制到飞书 · 含公式和图表」，外观与原生按钮一致。点击浏览器扩展图标还可以查看当前页面是否已连接当前扩展版本；没有连接时点击「检查并启用当前页面」。
 
 ## 安装
 
@@ -34,7 +30,7 @@
 4. 选择包含 `manifest.json` 的文件夹。
 5. 刷新 ChatGPT 网页，可以将扩展固定到浏览器工具栏。
 
-v1.2.2 于 2026-10-20 提交 Chrome 应用商店审核，2026-10-29 核实已公开上架。v1.2.5 更名为“ChatGPT 飞书复制助手”，沿用同一个商店条目，并更新中文介绍与公开示例截图；已于 2026-10-29 提交审核，后台显示“待审核”，审核通过后自动发布。详见 [本次商店更新记录](docs/store-update-v1.2.5.zh-CN.md)。`manual.zip` 用于手动安装；`store.zip` 用于商店后台上传，其 manifest 位于 ZIP 根目录。上传、提审和审核通过是不同阶段，以商店后台状态为准。
+本分支是尚未发布的 v1.2.6 维护试点。商店上架与审核的历史状态见 [v1.2.5 商店更新记录](docs/store-update-v1.2.5.zh-CN.md)，当前结果以商店后台为准。GitHub Release 只提供手动加载的 `manual.zip` 及对应校验值；`store.zip` 仅用于本地商店上传，其 manifest 位于 ZIP 根目录。
 
 ## 使用
 
@@ -101,31 +97,7 @@ HTML 自带可读取的图片、公式字体和查看脚本，离线可阅读，
 
 ## 验证
 
-v1.2.4：51/51 项自动检查通过；已使用本机登录的 Chrome for Testing 143，在真实 ChatGPT 与飞书网页版完成整段导出及原生复制按钮验收。修复粗体、列宽、完整卡片、SVG 清晰度、搜索卡片图片、正文词条和列表起点，详见 [验收记录与限制](docs/acceptance-v1.2.4.zh-CN.md)。旧 HTML 需重新导出。
-
-2026-10-19：15 项内核检查、4 项原有按钮集成检查、2 项新版消息结构与图表集成检查通过。已在用户提供的真实 ChatGPT 对话中点击原生复制按钮，随后在专用飞书测试文档通过浏览器 Ctrl+V 实际粘贴，再用 lark-cli 回读结构。没有向原 ChatGPT 对话发送测试消息。
-
-测试文档中的全文由浏览器粘贴形成，另以 lark-cli 回读确认原生公式及图片块结构。开源仓库不包含私有对话、测试文档地址、登录配置或浏览器用户数据。
-
-2026-10-20：内核 15 项检查再次通过；v1.1.1 的图标复制已在真实 ChatGPT 页面验收。v1.1.2 增加隐私说明并收窄固定网站权限，转换算法保持一致。
-
-v1.1.3：新增完整流程、无箭头的并排数字卡片、来源图标和通用 Grid / Flex 识别检查，内核共 20 项。真实网页原生复制后，在飞书通过 Ctrl+V 验证同一回复保留 12 个原生公式、1 张完整数字卡片图和 1 张完整流程图，无来源图标占位。布局识别使用启发式规则，复杂 iframe 和未渲染内容仍不在保证范围内。
-
-v1.2.0：31 项内核及会话导出检查通过，另验证 6 项原有按钮与图表集成，以及真实取消按钮。实际导出 14 条消息（8 条用户、6 条回复）为离线文件；断网阅读确认 26 个公式与全部 8 张图片可见。从文件点击“复制全部到飞书”后，飞书回读为 26 个原生公式、8 个图片块，双方消息数量和顺序一致。
-
-v1.2.1：适配新版 ChatGPT 无 `pre` 外层的代码组件，统一恢复标准代码块和语言标记，避免注释被飞书解析为标题。34 项自动检查通过；按用户示例实际粘贴并回读为 1 个原生 Python 代码块，20 行源码的缩进、空行、中文和注释保持一致（飞书归一化结尾换行）。普通程序代码的原生复制按钮也增强为代码块富文本，纯文本仍为原始源码。整段会话导出沿用此修复，旧 HTML 需重新导出。
-
-v1.2.2：修复把整条 Flex 回复误识别成图形的边界问题，37 项自动检查和 6 项复制按钮、图表集成检查通过。重新导出真实会话 14 条消息，离线预览无网络请求；经浏览器粘贴、飞书回读及页面检查，保留 31 个原生公式。Recall 回复恢复 3 个原生公式、1 个代码块及单独的流程图，Precision 回复恢复 2 个原生公式、原生表格及单独的指标卡片。旧导出中这两条回复被整体转成图片的问题已修复，旧 HTML 需重新导出。
-
-本地检查不需要飞书凭据，也不写在线文档：
-
-```text
-python -m pip install playwright
-python -m playwright install chromium
-python tests/run_tests.py --work-dir work/test-tmp
-```
-
-可用 `--browser` 指定本地 Chromium 可执行文件。
+项目提供本地浏览器回归测试，命令与手动验收清单见 [参与开发](CONTRIBUTING.md)。各版本的实际样本、公式与图片计数以及验证环境见 [验证历史](docs/validation-history.zh-CN.md)、[v1.2.4 验收记录](docs/acceptance-v1.2.4.zh-CN.md)。本次维护整理不新增真实网站验收。
 
 ## 数据和权限
 
@@ -141,4 +113,4 @@ python tests/run_tests.py --work-dir work/test-tmp
 
 公式支持参考[飞书公式说明](https://www.feishu.cn/hc/zh-CN/articles/894598450617-在文档中使用公式)；扩展架构参考 [Chrome Offscreen API](https://developer.chrome.com/docs/extensions/reference/api/offscreen)。表格标记和图片尺寸属性通过本次真实飞书行为及公开页面脚本核对。
 
-新写源码采用 MIT 许可证。所有 JavaScript 和字体随包提供，不从 CDN 加载可执行代码。依赖许可证见 `THIRD_PARTY_NOTICES.md` 和 `vendor/`。
+所有 JavaScript 和字体随包提供，不从 CDN 加载可执行代码。
