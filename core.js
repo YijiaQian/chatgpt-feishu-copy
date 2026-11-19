@@ -154,21 +154,38 @@
     }
   }
 
-  function cloneAnswer(source,{snapshots=new Map()}={}) {
+  function preserveLineBreaks(source,copy){
+    if(source.closest('pre,code,textarea,svg,'+formulaSelector))return;
+    const textNodes=[...copy.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE&&/[\r\n]/.test(node.nodeValue));
+    if(!textNodes.length||!['pre','pre-wrap','pre-line','break-spaces'].includes(getComputedStyle(source).whiteSpace))return;
+    for(const node of textNodes){
+      const fragment=document.createDocumentFragment();
+      node.nodeValue.split(/\r\n?|\n/).forEach((line,index)=>{
+        if(index)fragment.append(document.createElement('br'));
+        fragment.append(line);
+      });
+      node.replaceWith(fragment);
+    }
+  }
+  function cloneAnswer(source,{snapshots=new Map(),userMessage=false}={}) {
+    const snapshotImage=shot=>{
+      const img=document.createElement('img');img.src=shot.dataUrl;img.alt=shot.alt||'交互曲线图';
+      img.setAttribute('data-cfb-width',String(shot.width));img.setAttribute('data-cfb-height',String(shot.height));
+      img.setAttribute('data-cfb-chart-image','true');return img;
+    };
+    if(snapshots.has(source))return snapshotImage(snapshots.get(source));
     const clone=source.cloneNode(true);
     const srcNodes=[source,...source.querySelectorAll('*')], dstNodes=[clone,...clone.querySelectorAll('*')];
     srcNodes.forEach((node,i)=>{
       const copy=dstNodes[i];
+      if(userMessage)preserveLineBreaks(node,copy);
       if(node.matches('table')){
         const row=[...node.rows].find(row=>row.closest('table')===node);
         const widths=row?[...row.cells].flatMap(cell=>Array.from({length:cell.colSpan||1},()=>cell.getBoundingClientRect().width/(cell.colSpan||1))):[];
         if(widths.length&&widths.every(w=>w>0))copy.setAttribute('data-cfb-col-widths',JSON.stringify(widths));
       }
       if(snapshots.has(node)){
-        const shot=snapshots.get(node),img=document.createElement('img');img.src=shot.dataUrl;img.alt=shot.alt||'交互曲线图';
-        img.setAttribute('data-cfb-width',String(shot.width));img.setAttribute('data-cfb-height',String(shot.height));
-        img.setAttribute('data-cfb-chart-image','true');
-        if(node===source){clone.replaceChildren(img);}else copy.replaceWith(img);
+        copy.replaceWith(snapshotImage(snapshots.get(node)));
         return;
       }
       if(node.matches('img')){

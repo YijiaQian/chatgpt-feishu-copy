@@ -1,9 +1,9 @@
-# ChatGPT 飞书复制助手 v1.2.7
+# ChatGPT 飞书复制助手 v1.2.10
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-把 ChatGPT 回复中的 Markdown、LaTeX、表格、图片和可读取的图表，转换成适合飞书文档粘贴的富文本。支持增强原生复制按钮、整段会话导出到本地，以及独立 Markdown 转换工具。无需 API Key 或飞书应用凭据。
+把 ChatGPT 回复中的 Markdown、LaTeX、表格、图片和可读取的图表，转换成适合飞书文档粘贴的富文本。支持单条回复增强复制、整段会话复制和本地导出，也提供独立 Markdown 转换工具。无需 API Key 或飞书应用凭据。
 
 这是独立开源工具，与 OpenAI、飞书、Google 或 Microsoft 没有隶属或官方合作关系。已上架 [Chrome 应用商店](https://chromewebstore.google.com/detail/lioeeehlohnekghgohhagbammgbbcbfn)，也提供手动安装包；Edge 商店尚未提交。
 
@@ -12,7 +12,7 @@
 - [报告问题](https://github.com/YijiaQian/chatgpt-feishu-copy/issues)
 - [参与开发](CONTRIBUTING.md) · [文档导航](docs/README.md) · [商店发布材料](docs/store-listing.zh-CN.md)
 - [产品需求文档与架构流程图](docs/PRD.zh-CN.md)
-- [整段会话离线导出设计与验收](docs/conversation-export.zh-CN.md)
+- [整段会话复制与导出的设计及验收](docs/conversation-export.zh-CN.md)
 
 ![独立 Markdown 转换工具与公开测试内容](docs/assets/store/05-markdown.png)
 
@@ -57,15 +57,17 @@ v1.2.7 修复文件文字链接旁的小箭头被转为独立图片、导致飞�
 ## 导出完整当前会话
 
 1. 打开已有的 ChatGPT 对话，等待当前回复生成结束。
-2. 点击浏览器扩展图标，再点击 **导出当前会话到本地**。
-3. 扩展自动滚动加载当前分支，按顺序收集用户消息和 ChatGPT 回复。页面显示进度并可取消；请保持页面在前台，暂勿操作对话。完成或取消后会尽量恢复原来的阅读位置。
-4. 浏览器下载一个 `ChatGPT-会话标题-日期.html` 文件。用 Chrome / Edge 打开，点击 **复制全部到飞书**，再到飞书文档 Ctrl+V。也可使用各条消息旁的 **复制本条**。
+2. 点击浏览器扩展图标，选择 **复制当前会话到飞书** 或 **导出当前会话到本地**。
+3. 扩展在当前会话的滚动区域加载历史，按顺序收集消息。请保持页面在前台，暂勿操作对话。可以在进度面板取消。完成或取消后会尽量恢复原来的阅读位置。
+4. 直接复制时，等到「已复制 N 条消息」提示，再到飞书文档按 **Ctrl+V**。本地导出时，用 Chrome / Edge 打开下载的 `ChatGPT-会话标题-日期.html`，点击 **复制全部到飞书** 或 **复制本条** 后再粘贴。
 
-HTML 自带可读取的图片、公式字体和查看脚本，离线可阅读，不依赖临时图片链接。公式在本地渲染，复制时恢复为飞书识别的 LaTeX 分隔符；表格公式、卡片及图表按前文规则保留。复制时的图片开关不影响完整导出，导出会尝试嵌入所有可读取图片。
+两种方式使用相同的飞书格式，都会尝试嵌入可读取图片。离线 HTML 内含公式字体和查看脚本。复制时，正文公式使用飞书识别的 LaTeX 分隔符，表格公式、卡片及图表按前文规则保留。
 
-范围为当前打开分支中的网页消息，不包含其他会话、未选择的历史分支、隐藏的思考过程，或原始附件文件。能识别到的文件附件保留名称并提示。不可读取的资源会列入文件内的警告；历史扫描未完成时不会生成冒充完整会话的文件。页面结构变化可能影响识别。
+整段复制和导出保留当前分支的用户提问、ChatGPT 正式回复及可读取的图片，跳过独立的思考摘要与进度提示。提问的换行会随富文本复制，回复正文的小标题归在对应的消息标题下。可识别的文件附件会保留名称。资源读取失败时会提示，可通过本地导出查看详情。若历史扫描未完成，操作会停止。要让旧 HTML 应用排版和过滤修复，请从原会话重新导出。
 
-单次最多 2000 条消息，内容和最终文件各限制约 128 MB；单条消息仍沿用 24 MB 的媒体限制。超大文件可分条复制到飞书；文件包含会话来源地址及正文，分享前请自行检查。
+若提示「无法确定当前会话」，请关闭会话预览或搜索结果，刷新当前会话后重试。
+
+复制的富文本上限为 24 MB。超限时可改用本地导出，再逐条复制。每次最多收集 2000 条消息，收集内容和最终文件各限制约 128 MB，单条消息的媒体上限为 24 MB。文件和整段剪贴板内容均包含会话来源地址及正文。
 
 ## 各类内容的保留方式
 
@@ -108,7 +110,7 @@ HTML 自带可读取的图片、公式字体和查看脚本，离线可阅读，
 
 ## 源码和依赖
 
-`content.js` 适配复制按钮并调度导出，`conversation.js` 扫描虚拟滚动历史并排列双方消息，`archive.js` 生成单文件 HTML，`archive-viewer.js` 提供离线公式预览及飞书复制；`charts.js` 捕获图表和卡片，`core.js` 转换结构，`background.js` 下载图片和读取固定的本地离线资源，`offscreen.js` 渲染布局及图片，`converter.html` 是独立工具。无需构建，源码直接加载。
+`content.js` 适配复制按钮并调度整段复制和导出。`conversation.js` 扫描虚拟滚动历史并排列双方消息。`archive.js` 生成剪贴板内容和单文件 HTML，`archive-viewer.js` 提供离线公式预览及飞书复制。`charts.js` 捕获图表和卡片，`core.js` 转换结构。`background.js` 下载图片和读取本地离线资源，`offscreen.js` 渲染布局及图片。`converter.html` 是独立工具。扩展可直接加载源码。
 
 运行 `python scripts/package.py`，会在 `dist/` 生成商店包、手动安装包及 SHA-256 校验文件。商店包只含运行文件；手动包另含文档、测试和打包脚本。两者均按固定清单打包，排除 Git 历史、开发配置和私有验收材料。项目自身代码采用 [MIT](LICENSE) 许可，依赖采用各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

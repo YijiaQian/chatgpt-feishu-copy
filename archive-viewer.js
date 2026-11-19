@@ -2,15 +2,8 @@
 (() => {
   'use strict';
   const status=document.getElementById('archive-status');
-  const plain=root=>{
-    function walk(node){if(node.nodeType===3)return node.nodeValue;if(node.nodeType!==1)return '';if(node.tagName==='IMG')return node.alt||'[图片]';if(node.tagName==='BR')return '\n';const text=[...node.childNodes].map(walk).join('');return /^(P|DIV|SECTION|H[1-6]|PRE|BLOCKQUOTE|LI|TR)$/.test(node.tagName)?text+'\n':/^(TH|TD)$/.test(node.tagName)?text+'\t':text;}
-    return walk(root).replace(/\n{3,}/g,'\n\n').trim();
-  };
   async function copy(target){
-    const clone=target.cloneNode(true);clone.querySelectorAll('[data-export-ui]').forEach(n=>n.remove());
-    clone.querySelectorAll('[data-export-tex]').forEach(node=>node.replaceWith(document.createTextNode(node.dataset.exportDelimiters)));
-    const html='<meta charset="utf-8">'+clone.outerHTML,text=plain(clone);
-    if(new Blob([html]).size>24*1024*1024)throw new Error('整份内容较大，请使用各条消息旁的“复制本条”。');
+    const {html,text}=CFBArchiveClipboard.prepare(target,'整份内容较大，请使用各条消息旁的“复制本条”。');
     if(navigator.clipboard?.write&&globalThis.ClipboardItem){
       try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);return;}catch{/* file:// can deny async clipboard; try the user-gesture fallback. */}
     }
