@@ -1,4 +1,4 @@
-# ChatGPT 飞书复制助手 v1.2.6
+# ChatGPT 飞书复制助手 v1.2.7
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -30,7 +30,7 @@
 4. 选择包含 `manifest.json` 的文件夹。
 5. 刷新 ChatGPT 网页，可以将扩展固定到浏览器工具栏。
 
-v1.2.6 是文档与开发维护工具更新，转换行为和浏览器权限保持不变。该版通过 GitHub 手动安装包分发，未向应用商店提审。商店上架与审核的历史状态见 [v1.2.5 商店更新记录](docs/store-update-v1.2.5.zh-CN.md)，当前结果以商店后台为准。GitHub Release 只提供手动加载的 `manual.zip` 及对应校验值；`store.zip` 仅用于本地商店上传，其 manifest 位于 ZIP 根目录。
+v1.2.7 修复文件文字链接旁的小箭头被转为独立图片、导致飞书正文断行的问题，浏览器权限保持不变。本地提供 `store.zip` 供商店上传，尚未上传或提审。商店上架与审核的历史状态见 [v1.2.5 商店更新记录](docs/store-update-v1.2.5.zh-CN.md)，当前结果以商店后台为准。GitHub Release 只提供手动加载的 `manual.zip` 及对应校验值；`store.zip` 仅用于本地商店上传，其 manifest 位于 ZIP 根目录。
 
 ## 使用
 
@@ -48,6 +48,7 @@ v1.2.6 是文档与开发维护工具更新，转换行为和浏览器权限保�
 - 含单选项、滑块的独立计算卡片保留为当前状态的静态图片，包括选中项和金额；粘贴后无法继续交互，修改参数后需重新复制。
 - 费用摘要和时间结构连同标题、金额一起保存；百分比尺寸 SVG 按网页显示尺寸生成清晰图片。独立有序列表明确重置编号，图标旁的说明正文保持可编辑。
 - 正文中的内联可点击词条保留文字。网站仅通过弹窗提供、没有实际链接地址的词条仍为文字。
+- 文字链接中不带说明、尺寸不超过 32 像素的 SVG 装饰图标不转为图片，保留文件名、链接和前后标点；带说明的 SVG、图形链接和真实图片继续保留。单条复制和重新导出会话均适用，旧 HTML 需重新导出。
 
 仅复制成纯 Markdown 后，如果内容里只剩 `Chart` 和图例，原始图表数据已经丢失，无法从这些文字自动还原原图。请直接从原始 ChatGPT 网页复制，或通过「插入本地图片」补入图表。新版会明确提示这类缺失。跨域 iframe 内的图表仍需先下载或导出原图。
 

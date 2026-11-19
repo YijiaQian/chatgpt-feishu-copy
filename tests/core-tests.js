@@ -168,6 +168,24 @@
       assert(colored>500,'Blank screenshot without colored curves');assert(shot.width>320,'No padding for axis labels');
     }finally{root.remove();}
   });
+  await check('文件文字链接的小箭头不转图片，文件名、标点和表格保持完整',async()=>{
+    const root=document.createElement('div');root.innerHTML='<p>源码：<a href="https://example.org/repo/file.py#L8-L20"><code>file.py</code><svg width="12" height="12" aria-hidden="true"><path d="M3 9 9 3M3 3h6v6"/></svg></a>、<a href="https://example.org/repo/config.toml">config.toml<span><svg style="width:14px;height:14px"><use href="#external-link"/></svg></span></a>，继续正文。</p><table><tr><td><a href="https://example.org/repo/worker.py">worker.py<svg width="16" height="16"><path d="M4 12 12 4"/></svg></a></td></tr></table>';document.body.append(root);
+    try{
+      const result=await CFB.prepare(CFB.cloneAnswer(root),{media:async()=>{throw new Error('Link decoration must not request media');}}),copy=document.createElement('div');copy.innerHTML=result.html;
+      assert(!result.warnings.length&&result.stats.icons===0&&!copy.querySelector('img,svg'),'Link arrow became an image or fallback warning');
+      assert(copy.querySelector('p').textContent==='源码：file.py、config.toml，继续正文。','Sentence or punctuation changed');
+      assert(copy.querySelector('a code')?.textContent==='file.py'&&copy.querySelector('td a')?.textContent==='worker.py','Filename formatting or table link lost');
+      assert([...copy.querySelectorAll('a')].map(a=>a.getAttribute('href')).join('|')==='https://example.org/repo/file.py#L8-L20|https://example.org/repo/config.toml|https://example.org/repo/worker.py','Source URL or line anchor changed');
+    }finally{root.remove();}
+  });
+  await check('链接清理保留有说明的 SVG、图形链接、真实图片和独立图标',async()=>{
+    const root=document.createElement('div');root.innerHTML=`<p><a href="https://example.org/legend">说明<svg width="16" height="16"><title>状态标记</title><path/></svg></a><a href="https://example.org/status">状态<svg role="img" aria-label="完成" width="16" height="16"><path/></svg></a><a href="https://example.org/icon"><svg width="16" height="16"><path/></svg></a><a href="https://example.org/photo">插图<img src="${png}" width="16" height="16"></a><svg width="16" height="16"><path/></svg></p><a href="https://example.org/chart">图表<svg width="180" height="100"><path/></svg></a>`;document.body.append(root);
+    try{
+      const result=await CFB.prepare(CFB.cloneAnswer(root),{media}),copy=document.createElement('div');copy.innerHTML=result.html;
+      assert(result.stats.icons===5&&result.stats.images===1&&copy.querySelectorAll('img').length===6,'Meaningful SVG, standalone icon or illustration removed');
+      assert(copy.querySelectorAll('a').length===5&&copy.querySelector('a[href="https://example.org/icon"] img'),'Image-only link lost');
+    }finally{root.remove();}
+  });
   await check('引用来源图标不作为正文图片下载 且真实插图保留',async()=>{
     const element=document.createElement('div');element.innerHTML=`<p>来源：<a href="https://example.org/paper"><span data-d-component="favicon"><img width="12" src="https://www.google.com/s2/favicons?domain=https://example.org&sz=32"></span>研究来源</a></p><img alt="actual illustration" src="${png}" width="160">`;document.body.append(element);
     try{const r=await CFB.prepare(CFB.cloneAnswer(element),{media});assert(!r.html.includes('favicons')&&!r.html.includes('查看原图'),'Citation favicon leaked');assert(r.html.includes('https://example.org/paper')&&r.html.includes('研究来源'),'Citation link lost');assert(r.stats.images===1,'Real illustration lost');}finally{element.remove();}

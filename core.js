@@ -201,6 +201,18 @@
     // Modern ChatGPT renders a block as a div + code, without a pre. Rebuild
     // semantic blocks before removing the toolbar that contains the language.
     normalizeCodeBlocks(clone);
+    // Small, unlabelled SVGs beside a link's text are UI decoration. Turning
+    // them into PNGs makes Feishu split inline file references into image blocks.
+    clone.querySelectorAll('a[href]').forEach(link=>{
+      const label=link.cloneNode(true);
+      label.querySelectorAll('svg,img,canvas,.sr-only,[data-cfb-remove]').forEach(node=>node.remove());
+      if(!label.textContent.trim())return;
+      link.querySelectorAll('svg').forEach(svg=>{
+        if(svg.closest('pre,code,'+formulaSelector)||svg.matches('[role="img"],[aria-label],[aria-labelledby]')||svg.querySelector('title,desc,text,image,foreignObject'))return;
+        const width=Number(svg.getAttribute('data-cfb-width')),height=Number(svg.getAttribute('data-cfb-height'));
+        if(width>0&&height>0&&width<=32&&height<=32)svg.remove();
+      });
+    });
     // Source-chip favicons are decoration, not document illustrations. Keep the
     // surrounding citation/link text without downloading their tracking URLs.
     clone.querySelectorAll('[data-d-component="popover-trigger"][role="button"]').forEach(node=>{
