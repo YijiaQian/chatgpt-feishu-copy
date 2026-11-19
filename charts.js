@@ -103,11 +103,11 @@
   }
   function chartRoots(root){
     const nodes=new Set();
-    for(const element of root.querySelectorAll(candidates)){
+    for(const element of [...(root.matches?.(candidates)?[root]:[]),...root.querySelectorAll(candidates)]){
       if(element.closest(codeContainers+',.katex,mjx-container,math')||!element.querySelector('svg,canvas'))continue;
       const rect=element.getBoundingClientRect();if(rect.width>90&&rect.height>60)nodes.add(element);
     }
-    for(const graphic of root.querySelectorAll('svg,canvas')){
+    for(const graphic of [...(root.matches?.('svg,canvas')?[root]:[]),...root.querySelectorAll('svg,canvas')]){
       if(graphic.closest(codeContainers+',.katex,mjx-container,math,button,[data-cfb-ui]'))continue;
       if([...nodes].some(n=>n.contains(graphic)))continue;
       const rect=graphic.getBoundingClientRect();

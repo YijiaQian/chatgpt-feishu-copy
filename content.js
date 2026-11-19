@@ -66,12 +66,26 @@
     return response.result;
   }
   async function convertSource(source,{embedImages=settings.embedImages}={}){
-      let snapshots=new Map(),chartWarnings=[];
-      if(source.element&&globalThis.CFBCharts){const captured=await CFBCharts.snapshot(source.element,{media});snapshots=captured.snapshots;chartWarnings=captured.warnings;}
-      const root=source.code!==undefined?CFB.codeBlock(source.code,source.language):source.markdown!==undefined?CFB.parseMarkdown(source.markdown):CFB.cloneAnswer(source.element,{snapshots});
-      if(source.element?.querySelector('iframe'))chartWarnings.push('检测到内嵌页面：如果图表在 iframe 内，请先打开图表，再使用图表下载功能插入原图。');
+      let charts=0,diagrams=0;
+      const chartWarnings=[];
+      let root;
+      if(source.code!==undefined)root=CFB.codeBlock(source.code,source.language);
+      else if(source.markdown!==undefined)root=CFB.parseMarkdown(source.markdown);
+      else{
+        const parts=source.parts||[source.element];
+        const clones=[];
+        for(const part of parts){
+          const captured=globalThis.CFBCharts?await CFBCharts.snapshot(part,{media}):{snapshots:new Map(),warnings:[]};
+          chartWarnings.push(...captured.warnings);
+          for(const shot of captured.snapshots.values())shot.kind==='diagram'?diagrams++:charts++;
+          clones.push(CFB.cloneAnswer(part,{snapshots:captured.snapshots,userMessage:source.userMessage}));
+        }
+        if(parts.some(part=>part.querySelector('iframe')))chartWarnings.push('检测到内嵌页面：如果图表在 iframe 内，请先打开图表，再使用图表下载功能插入原图。');
+        if(clones.length===1)root=clones[0];
+        else{root=document.createElement('div');root.append(...clones);}
+      }
       const result=await CFB.prepare(root,{media,embedImages});
-      result.warnings.push(...chartWarnings);result.stats.charts=[...snapshots.values()].filter(shot=>shot.kind!=='diagram').length;result.stats.diagrams=[...snapshots.values()].filter(shot=>shot.kind==='diagram').length;
+      result.warnings.push(...chartWarnings);result.stats.charts=charts;result.stats.diagrams=diagrams;
       if(!result.text&&!result.stats.images&&!result.stats.icons)throw new Error('没有找到可复制的内容。');
       if(source.code!==undefined)result.text=source.code;
       return result;
@@ -88,40 +102,53 @@
     }catch(error){toast('复制失败：'+error.message+'\n可按住 Alt 再点击原复制按钮，使用原始复制。',true);}
     finally{busy=false;}
   }
-  let exportTask;
-  function exportPanel(){
+  function conversationPanel(action,task){
     document.getElementById('cfb-export-progress')?.remove();
     const host=document.createElement('div');host.id='cfb-export-progress';host.dataset.cfbUi='true';host.style.cssText='position:fixed;right:24px;bottom:24px;z-index:2147483647';
     const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<style>section{box-sizing:border-box;width:330px;background:#fff;color:#1f2329;border:1px solid #d0d5dd;border-radius:12px;box-shadow:0 8px 32px #0002;padding:18px;font:14px/1.6 system-ui,sans-serif}h2{font-size:15px;margin:0 0 8px}p{margin:8px 0;color:#667085;font-size:12px}button{font:inherit;color:#344054;background:white;border:1px solid #d0d5dd;border-radius:7px;padding:4px 12px;cursor:pointer}progress{width:100%;height:5px;accent-color:#215df1}#state{margin:10px 0;white-space:pre-wrap}</style><section role="status"><h2>导出当前会话</h2><progress></progress><div id="state">正在加载历史消息…</div><p>会自动滚动加载当前分支。请保持页面在前台，暂勿切换分支或操作对话。</p><button type="button">取消导出</button></section>';
-    shadow.querySelector('button').addEventListener('click',()=>{exportTask?.abort();shadow.querySelector('#state').textContent='正在停止，将在当前图片处理后退出…';});
+    shadow.querySelector('h2').textContent=action+'当前会话';
+    const cancel=shadow.querySelector('button');cancel.textContent='取消'+action;
+    cancel.addEventListener('click',()=>{task.abort();shadow.querySelector('#state').textContent='正在停止，将在当前图片处理后退出…';});
     document.documentElement.append(host);return {host,update:info=>{shadow.querySelector('#state').textContent=(info.phase==='convert'?'正在转换文字、公式与图片…':'正在加载历史消息…')+'\n已收集 '+info.messages+' 条消息';}};
   }
-  async function exportConversation(){
+  async function startConversation(copying){
     if(busy)return {ok:false,error:'上一份内容仍在转换或导出，请稍候。'};
-    if(!globalThis.CFBConversation||!globalThis.CFBArchive)return {ok:false,error:'导出模块未连接，请刷新 ChatGPT 页面后重试。'};
-    if(CFBConversation.streaming(document))return {ok:false,error:'ChatGPT 正在生成回复，请完成后再导出。'};
-    busy=true;exportTask=new AbortController();const task=exportTask,panel=exportPanel();
-    const interrupted=event=>{if(event.target instanceof Element&&!event.target.closest('[data-cfb-ui]'))task.abort(new Error('检测到页面操作，已停止导出。请保持会话不变后重试。'));};
+    const action=copying?'复制':'导出';
+    if(!globalThis.CFBConversation||!globalThis.CFBArchive||!globalThis.CFBArchiveClipboard)return {ok:false,error:'会话模块未连接，请刷新 ChatGPT 页面后重试。'};
+    let scope;
+    try{scope=CFBConversation.resolveContext();}catch(error){return {ok:false,error:error.message};}
+    if(scope.isStreaming())return {ok:false,error:'ChatGPT 正在生成回复，请等待完成后再'+action+'。'};
+    busy=true;const task=new AbortController(),panel=conversationPanel(action,task);
+    const interrupted=event=>{if(event.target instanceof Element&&!event.target.closest('[data-cfb-ui]'))task.abort(new Error('检测到页面操作。请保持会话不变后重试。'));};
     window.addEventListener('pointerdown',interrupted,{capture:true});
     const abort=()=>task.abort();controller.signal.addEventListener('abort',abort,{once:true});
     (async()=>{
       try{
-        const archive=await CFBConversation.collect({signal:task.signal,onProgress:panel.update,convert:async message=>{
-          const result=await convertSource({element:message.node},{embedImages:true});
-          if(message.role==='user')result.html='<div style="white-space:pre-wrap">'+result.html+'</div>';
+        const archive=await CFBConversation.collect({scope,signal:task.signal,onProgress:panel.update,convert:async message=>{
+          const result=await convertSource({parts:message.parts,userMessage:message.role==='user'},{embedImages:true});
           const attachments=[...message.node.querySelectorAll('button,[role="button"],a[download]')].filter(e=>/\.(?:pdf|docx?|xlsx?|pptx?|zip|csv|json|txt)\b/i.test(e.textContent)&&!e.querySelector('img'));
           for(const label of [...new Set(attachments.map(e=>e.textContent.trim()))]){result.html+='<p>附件：'+CFB.esc(label)+'（仅保存名称，原文件未打包）</p>';result.warnings.push('附件“'+label+'”仅保存名称，原文件未打包。');}
           return result;
         }});
         task.signal.throwIfAborted();panel.update({phase:'convert',messages:archive.messages.length});
+        if(copying){
+          const result=CFBArchive.buildClipboard(archive);
+          await CFB.writeClipboard(result);
+          const note=result.warnings.length?'\n有 '+result.warnings.length+' 项内容需要检查，可本地导出查看提示。':'';
+          toast('已复制 '+result.stats.messages+' 条消息，可到飞书文档按 Ctrl+V。'+note,result.warnings.length>0);
+          return;
+        }
         const response=await chrome.runtime.sendMessage({target:'background',type:'ARCHIVE_ASSETS'});
         if(!response?.ok)throw new Error(response?.error||'离线资源读取失败');
         task.signal.throwIfAborted();
         const result=CFBArchive.build(archive,response.result);CFBArchive.download(result);
         await chrome.storage.local.set({lastExport:{time:Date.now(),stats:result.stats,warnings:result.warnings}});
         toast(`已生成本地 HTML：${result.stats.messages} 条消息（用户 ${result.stats.users} / ChatGPT ${result.stats.assistants}）。\n包含 ${result.stats.formulas} 个公式、${result.stats.images} 张图片、${result.stats.icons} 个图标。\n在浏览器中打开下载的文件，可复制全部或分条复制到飞书。`+(result.warnings.length?'\n有 '+result.warnings.length+' 项内容需要检查，详见文件内提示。':''),result.warnings.length>0);
-      }catch(error){toast((task.signal.aborted?'导出已取消':'导出失败')+'：'+(task.signal.reason?.message||error.message),true);}
-      finally{panel.host.remove();window.removeEventListener('pointerdown',interrupted,true);controller.signal.removeEventListener('abort',abort);if(exportTask===task)exportTask=null;busy=false;}
+      }catch(error){
+        if(task.signal.aborted)toast(action+'已取消'+(error.name==='AbortError'?'':'：'+error.message),true);
+        else toast(action+'失败：'+error.message,true);
+      }
+      finally{panel.host.remove();window.removeEventListener('pointerdown',interrupted,true);controller.signal.removeEventListener('abort',abort);busy=false;}
     })();
     return {ok:true};
   }
@@ -152,6 +179,11 @@
   const start=()=>{mountActions();observer.observe(document.body,{childList:true,subtree:true});};
   if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true,signal:controller.signal});
   controller.signal.addEventListener('abort',()=>{observer.disconnect();clearTimeout(timer);document.querySelectorAll('button[data-cfb-ui]').forEach(n=>n.remove());});
-  const onMessage=(msg,_sender,reply)=>{if(msg?.type==='CFB_PING')reply({version:chrome.runtime.getManifest().version,enabled:settings.enabled,answers:document.querySelectorAll('[data-message-author-role="assistant"],article[data-turn="assistant"],[data-markdown-text-style="assistant-message"]').length});if(msg?.type==='CFB_EXPORT'){exportConversation().then(reply).catch(e=>reply({ok:false,error:e.message}));return true;}};
+  const onMessage=(msg,_sender,reply)=>{
+    if(msg?.type==='CFB_PING')reply({version:chrome.runtime.getManifest().version,enabled:settings.enabled});
+    if(msg?.type==='CFB_EXPORT'||msg?.type==='CFB_COPY_CONVERSATION'){
+      startConversation(msg.type==='CFB_COPY_CONVERSATION').then(reply).catch(e=>reply({ok:false,error:e.message}));return true;
+    }
+  };
   chrome.runtime.onMessage.addListener(onMessage);controller.signal.addEventListener('abort',()=>chrome.runtime.onMessage.removeListener(onMessage));
 })();

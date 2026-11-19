@@ -30,11 +30,11 @@ let archiveAssetsPromise;
 async function archiveAssets(){
   if(!archiveAssetsPromise)archiveAssetsPromise=(async()=>{
     const read=path=>fetch(chrome.runtime.getURL(path)).then(r=>{if(!r.ok)throw new Error('离线资源读取失败');return r.text();});
-    const [viewerScript,katexScript,css,katexLicense,projectLicense]=await Promise.all([read('archive-viewer.js'),read('vendor/katex.min.js'),read('vendor/katex.min.css'),read('vendor/katex.LICENSE'),read('LICENSE')]);
+    const [viewerScript,clipboardScript,katexScript,css,katexLicense,projectLicense]=await Promise.all([read('archive-viewer.js'),read('archive-clipboard.js'),read('vendor/katex.min.js'),read('vendor/katex.min.css'),read('vendor/katex.LICENSE'),read('LICENSE')]);
     const fonts=[...new Set([...css.matchAll(/url\((fonts\/[A-Za-z0-9_-]+\.woff2)\)/g)].map(m=>m[1]))];
     const embedded=await Promise.all(fonts.map(async path=>{const response=await fetch(chrome.runtime.getURL('vendor/'+path));if(!response.ok)throw new Error('离线字体读取失败');return [path,await blobData(new Blob([await response.arrayBuffer()],{type:'font/woff2'}))];}));
     let katexCSS=css;for(const [path,data] of embedded)katexCSS=katexCSS.replaceAll('url('+path+')','url('+data+')');
-    return {viewerScript,katexScript,katexCSS,licenseText:'KaTeX:\n'+katexLicense+'\nChatGPT → Feishu viewer:\n'+projectLicense};
+    return {viewerScript,clipboardScript,katexScript,katexCSS,licenseText:'KaTeX:\n'+katexLicense+'\nChatGPT → Feishu viewer:\n'+projectLicense};
   })().catch(error=>{archiveAssetsPromise=null;throw error;});
   return archiveAssetsPromise;
 }
