@@ -76,6 +76,53 @@
       assert(user.text==='第一行\n第二行\n\n末段'&&user.html.includes('<br><strong')&&user.html.includes('</strong><br><br>'),'User line breaks or formatting were lost');
     }finally{root.remove();}
   });
+  await test('停止后重发同一提问，整段复制保留新版容器内的旧格式正文',async()=>{
+    const root=document.createElement('main');
+    root.innerHTML=`
+      <article data-turn-key="stopped"><div data-message-author-role="user" data-message-id="u1">同一提问</div>
+        <div data-turn="assistant" data-chatgpt-selection-message-id="stopped-reply">
+          <div role="status"><div class="markdown">已停止生成</div></div>
+        </div>
+      </article>
+      <article data-turn-key="resent"><div data-message-author-role="user" data-message-id="u2">同一提问</div>
+        <div data-chatgpt-selection-message-id="thinking"><div class="markdown">独立思考摘要</div></div>
+        <div data-turn="assistant" data-chatgpt-selection-message-id="final">
+          <div data-markdown-copy="exclude"><div class="markdown">回复外的状态</div></div>
+          <div class="markdown"><p>重发后的正式答复</p></div>
+        </div>
+        <div data-turn="assistant" aria-hidden="true"><div class="markdown">隐藏分支的答复</div></div>
+      </article>`;
+    document.body.append(root);
+    try{
+      const archive=await CFBConversation.collect({delay:10,convert:async message=>({
+        html:message.parts.map(part=>part.outerHTML).join('')
+      })});
+      const clipboard=CFBArchive.buildClipboard(archive);
+      assert(archive.messages.map(message=>message.key).join(',')==='user:u1,user:u2,assistant:final','The resent answer or one of the prompts was lost');
+      assert(clipboard.text.match(/同一提问/g)?.length===2&&clipboard.text.includes('重发后的正式答复'),'The whole conversation did not contain both prompts and the final answer');
+      for(const omitted of ['已停止生成','独立思考摘要','回复外的状态','隐藏分支的答复'])assert(!clipboard.text.includes(omitted),`Unexpected text: ${omitted}`);
+    }finally{root.remove();}
+  });
+  await test('同一轮有多个回复容器时，分别保留可见正文及页面顺序',()=>{
+    const root=document.createElement('div');
+    root.innerHTML=`
+      <article data-turn-key="mixed" data-turn="assistant">
+        <div data-message-author-role="assistant" data-message-id="legacy">
+          <div data-message-content><div class="markdown">旧格式正式答复<img alt="答复图片" src="data:image/png;base64,AA=="></div></div>
+        </div>
+        <div data-chatgpt-selection-message-id="modern">
+          <div class="markdown"><div data-markdown-text-style="assistant-message">带标记的正式答复</div></div>
+        </div>
+      </article>`;
+    document.body.append(root);
+    try{
+      const found=CFBConversation.messages(root);
+      const texts=found.map(message=>message.parts.map(part=>part.textContent.trim()).join('|'));
+      assert(texts.join(',')==='旧格式正式答复,带标记的正式答复','The marked answer masked another answer or changed its position');
+      assert(found[0].key==='assistant:legacy','The legacy answer lost its message ID');
+      assert(found[0].parts[0].querySelector('img')&&!found[1].parts.some(part=>part.matches('img')||part.querySelector('img')),'The image was lost or copied into the neighboring reply');
+    }finally{root.remove();}
+  });
   await test('无法扫完整段历史时失败，不返回部分会话冒充完整结果',async()=>{
     const f=fixture(20);let failed=false;
     try{await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:10,maxSteps:1});}catch(e){failed=e.message.includes('扫描未完成');}finally{f.remove();}

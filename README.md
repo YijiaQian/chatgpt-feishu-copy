@@ -1,4 +1,4 @@
-# ChatGPT 飞书复制助手 v1.2.10
+# ChatGPT 飞书复制助手 v1.2.11
 
 [![Checks](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml/badge.svg)](https://github.com/YijiaQian/chatgpt-feishu-copy/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

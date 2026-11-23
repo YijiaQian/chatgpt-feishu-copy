@@ -4,7 +4,9 @@
   const userSelector='[data-message-author-role="user"],[data-chatgpt-search-unit-key$=":user"],[data-user-message-bubble],.rich-text-user-turn,[data-markdown-text-tone="user-message"],[data-turn="user"]';
   const assistantBody='[data-markdown-text-style="assistant-message"]';
   const assistantAuthor='[data-message-author-role="assistant"]';
-  const assistantSelector=assistantAuthor+','+assistantBody+',[data-turn="assistant"]';
+  const assistantOwner=assistantAuthor+',[data-turn="assistant"]';
+  const assistantSelector=assistantOwner+','+assistantBody;
+  const legacyAssistantBody='.markdown,[data-message-content]';
   const selectors=userSelector+','+assistantSelector+',[data-chatgpt-selection-message-id]';
   const turnSelector='[data-turn-key],[data-content-search-turn-key],[data-testid^="conversation-turn-"]';
   const mainSelector='main,[role="main"]';
@@ -28,8 +30,12 @@
       const hasMarkedReply=turn&&[...turn.querySelectorAll(assistantBody)].some(isAssistantBody);
       if(!hasMarkedReply)return [node];
     }
-    // A turn or selection ID identifies a container, including status panels.
-    // Export marked reply text and media, without text from other descendants.
+    // A selection ID can also identify a status panel. Require an assistant
+    // owner when taking Markdown that lacks the modern reply marker.
+    if(!bodies.length&&node.matches(assistantOwner)){
+      const legacy=node.matches(legacyAssistantBody)?[node]:[...node.querySelectorAll(legacyAssistantBody)];
+      bodies.push(...legacy.filter(body=>body.closest(assistantOwner)===node&&isAssistantBody(body)));
+    }
     const media=[...node.querySelectorAll('img,canvas'),...(globalThis.CFBCharts?.chartRoots(node)||[])]
       .filter(part=>visible(part)&&!bodies.some(body=>part.contains(body))&&
         !part.closest('[data-d-component="favicon"],[data-markdown-copy="exclude"],.sr-only,[role="status"],summary'));
@@ -51,11 +57,25 @@
       if(belongs&&parts.some(part=>!belongs(part)||[...part.querySelectorAll(transcriptSelector)].some(child=>!belongs(child)&&child.querySelector(selectors))))throw new Error(scopeError);
       if(parts.length)candidates.set(node,{node,role,parts,turn});
     }
-    const messages=[...candidates.values()].filter(({node,role})=>{
+    const distinct=[...candidates.values()].filter(({node,role,parts})=>{
       for(let parent=node.parentElement;parent&&parent!==root;parent=parent.parentElement){
-        if(candidates.get(parent)?.role===role)return false;
+        const ancestor=candidates.get(parent);
+        if(ancestor?.role===role&&(role==='user'||parts.every(part=>ancestor.parts.some(outer=>outer.contains(part)))))return false;
       }
       return true;
+    });
+    // A retained child reply owns its parts, even if a parent also found its media.
+    for(const {node,role,parts} of distinct){
+      if(role!=='assistant')continue;
+      for(let parent=node.parentElement;parent&&parent!==root;parent=parent.parentElement){
+        const ancestor=candidates.get(parent);
+        if(ancestor?.role===role)ancestor.parts=ancestor.parts.filter(part=>!parts.some(child=>child.contains(part)));
+      }
+    }
+    const messages=distinct.filter(message=>message.parts.length).sort((a,b)=>{
+      const first=a.parts[0],second=b.parts[0];
+      if(first===second)return 0;
+      return first.compareDocumentPosition(second)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1;
     });
     return messages.map(({node,role,parts,turn})=>{
       const owner=node.closest('[data-message-id],[data-chatgpt-selection-message-id]');
