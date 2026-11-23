@@ -34,6 +34,121 @@
       assert(Math.abs(f.root.scrollTop-700)<3,'The active transcript scroll position was not restored');
     }finally{page.remove();}
   });
+  await test('页面跳回底部时，分步滚到顶部并从第一条开始采集',async()=>{
+    const f=fixture(16);
+    const move=f.root.scrollTo.bind(f.root);
+    let bounced=0;
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const originalTop=f.root.scrollTop;
+    f.root.scrollTo=options=>{
+      if(options.top===0&&f.root.scrollTop>f.root.clientHeight){
+        bounced++;
+        move({...options,top:originalTop});
+      }else move(options);
+      f.render();
+    };
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:5});
+      assert(bounced===1,'A rejected jump should be followed by incremental scrolling');
+      assert(archive.messages.length===16&&archive.messages.every((message,index)=>message.key.endsWith('turn-'+index+':0')),'The scan missed or reordered part of the conversation');
+      assert(Math.abs(f.root.scrollTop-originalTop)<3,'The original scroll position was not restored');
+    }finally{f.remove();}
+  });
+  await test('页面持续阻止上滚时，停止采集并提示手动滚到顶部',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const move=f.root.scrollTo.bind(f.root);
+    f.root.scrollTo=options=>{if(options.top>=f.root.scrollTop)move(options);};
+    let error,converted=0;
+    try{
+      await CFBConversation.collect({root:f.root,scroller:f.root,delay:5,convert:async item=>{converted++;return convert(item);}});
+    }catch(e){error=e;}finally{f.remove();}
+    assert(converted===0&&error?.message.includes('滚到顶部'),'The scan accepted a partial history or omitted the recovery instruction');
+  });
+  await test('滚动位置反复来回变化时，提前结束上滚探测',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const initial=f.root.scrollTop,move=f.root.scrollTo.bind(f.root);
+    let moves=0,error;
+    f.root.scrollTo=options=>{
+      moves++;
+      const top=options.top===0||options.top<initial-200?initial:options.top;
+      move({...options,top});f.render();
+    };
+    try{await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:3,maxSteps:70});}
+    catch(e){error=e;}finally{f.root.remove();}
+    assert(error?.message.includes('滚到顶部')&&moves<35,'Repeated positions kept resetting the retry count');
+  });
+  await test('自动上滚受阻后释放滚动条，手动到顶时继续同一次采集',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const move=f.root.scrollTo.bind(f.root);
+    let waiting=false,manualScrolled=false,automaticWhileWaiting=0,convertedBeforeTop=0;
+    f.root.scrollTo=options=>{
+      if(waiting)automaticWhileWaiting++;
+      if(options.top>=f.root.scrollTop||!waiting&&f.root.scrollTop===0)move(options);
+      f.render();
+    };
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,delay:8,waitForManualTop:true,onProgress:info=>{
+        if(info.phase!=='manual-top')return;
+        waiting=true;
+        setTimeout(()=>{manualScrolled=true;move({top:0});f.render();},25);
+      },convert:async message=>{
+        if(!manualScrolled)convertedBeforeTop++;
+        waiting=false;
+        return convert(message);
+      }});
+      assert(automaticWhileWaiting===0&&convertedBeforeTop===0,'The extension fought manual scrolling or copied before the start was confirmed');
+      assert(archive.messages.length===16&&archive.messages.every((message,i)=>message.key.endsWith('turn-'+i+':0')),'The resumed copy omitted or reordered messages');
+    }finally{f.root.remove();}
+  });
+  function spacedHistory(){
+    const root=document.createElement('main');
+    root.style.cssText='height:200px;width:600px;overflow:auto;overflow-anchor:none';
+    root.innerHTML=`<div data-rail-chat-transcript><div></div><div style="position:relative;display:flow-root;height:560px">
+      <div style="margin-top:0">
+        <div data-virtualized-turn><article data-turn-key="first" style="height:160px"><div data-message-author-role="user">问题一</div><div data-message-author-role="assistant">回答一</div></article></div>
+      </div></div><div></div></div>`;
+    document.body.append(root);
+    const window=root.querySelector('[data-virtualized-turn]').parentElement;
+    const move=root.scrollTo.bind(root);
+    const last=`<div data-virtualized-turn><article data-turn-key="last" style="height:400px"><div data-message-author-role="user">问题二</div><div data-message-author-role="assistant">回答二</div></article></div>`;
+    return {root,window,last,move};
+  }
+  await test('顶部还只挂载后段消息时，等占位消失再复制',async()=>{
+    const f=spacedHistory();
+    const first=f.window.innerHTML;
+    f.window.style.marginTop='450px';
+    f.window.innerHTML=f.last;
+    const load=setTimeout(()=>{
+      f.window.style.marginTop='0';
+      f.window.innerHTML=first+f.last;
+    },230);
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:8});
+      assert(archive.messages.map(message=>message.text).join(',')==='问题一,回答一,问题二,回答二','Copy finished before the earlier rows were mounted');
+    }finally{clearTimeout(load);f.root.remove();}
+  });
+  await test('虚拟列表中间或末尾还有占位时，不能把局部扫描当作完整结果',async()=>{
+    for(const gap of ['middle','end']){
+      const f=spacedHistory();
+      f.window.parentElement.style.height='850px';
+      f.window.querySelector('article').style.height='300px';
+      if(gap==='end')f.window.insertAdjacentHTML('beforeend',f.last);
+      f.root.scrollTo=options=>{
+        if(gap==='middle'&&options.top>=150){
+          f.window.style.marginTop='450px';
+          f.window.innerHTML=f.last;
+        }
+        f.move(options);
+      };
+      let err;
+      try{await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:5,maxSteps:18});}
+      catch(e){err=e;}finally{f.root.remove();}
+      assert(err?.message.includes('历史消息'),`Accepted incomplete history with a gap at the ${gap}`);
+    }
+  });
   await test('两个可见会话无法确定归属时，读取正文前停止',async()=>{
     const page=document.createElement('main');page.innerHTML='<div class="thread-scroll-container"><article data-turn-key="one"><div data-message-author-role="user">第一段会话</div></article></div><div class="thread-scroll-container"><article data-turn-key="two"><div data-message-author-role="user">第二段会话</div></article></div>';
     document.body.append(page);let calls=0,error;
@@ -74,6 +189,53 @@
       assert(found[1].parts.map(n=>n.textContent).join('|')==='功能差异已梳理了功能差异，以下为正式回复。|检索正式回复的第二部分。','Reply content changed or leaked a progress line');
       const user=await CFB.prepare(CFB.cloneAnswer(found[0].parts[0],{userMessage:true}));
       assert(user.text==='第一行\n第二行\n\n末段'&&user.html.includes('<br><strong')&&user.html.includes('</strong><br><br>'),'User line breaks or formatting were lost');
+    }finally{root.remove();}
+  });
+  await test('停止后重发同一提问，整段复制保留新版容器内的旧格式正文',async()=>{
+    const root=document.createElement('main');
+    root.innerHTML=`
+      <article data-turn-key="stopped"><div data-message-author-role="user" data-message-id="u1">同一提问</div>
+        <div data-turn="assistant" data-chatgpt-selection-message-id="stopped-reply">
+          <div role="status"><div class="markdown">已停止生成</div></div>
+        </div>
+      </article>
+      <article data-turn-key="resent"><div data-message-author-role="user" data-message-id="u2">同一提问</div>
+        <div data-chatgpt-selection-message-id="thinking"><div class="markdown">独立思考摘要</div></div>
+        <div data-turn="assistant" data-chatgpt-selection-message-id="final">
+          <div data-markdown-copy="exclude"><div class="markdown">回复外的状态</div></div>
+          <div class="markdown"><p>重发后的正式答复</p></div>
+        </div>
+        <div data-turn="assistant" aria-hidden="true"><div class="markdown">隐藏分支的答复</div></div>
+      </article>`;
+    document.body.append(root);
+    try{
+      const archive=await CFBConversation.collect({delay:10,convert:async message=>({
+        html:message.parts.map(part=>part.outerHTML).join('')
+      })});
+      const clipboard=CFBArchive.buildClipboard(archive);
+      assert(archive.messages.map(message=>message.key).join(',')==='user:u1,user:u2,assistant:final','The resent answer or one of the prompts was lost');
+      assert(clipboard.text.match(/同一提问/g)?.length===2&&clipboard.text.includes('重发后的正式答复'),'The whole conversation did not contain both prompts and the final answer');
+      for(const omitted of ['已停止生成','独立思考摘要','回复外的状态','隐藏分支的答复'])assert(!clipboard.text.includes(omitted),`Unexpected text: ${omitted}`);
+    }finally{root.remove();}
+  });
+  await test('同一轮有多个回复容器时，分别保留可见正文及页面顺序',()=>{
+    const root=document.createElement('div');
+    root.innerHTML=`
+      <article data-turn-key="mixed" data-turn="assistant">
+        <div data-message-author-role="assistant" data-message-id="legacy">
+          <div data-message-content><div class="markdown">旧格式正式答复<img alt="答复图片" src="data:image/png;base64,AA=="></div></div>
+        </div>
+        <div data-chatgpt-selection-message-id="modern">
+          <div class="markdown"><div data-markdown-text-style="assistant-message">带标记的正式答复</div></div>
+        </div>
+      </article>`;
+    document.body.append(root);
+    try{
+      const found=CFBConversation.messages(root);
+      const texts=found.map(message=>message.parts.map(part=>part.textContent.trim()).join('|'));
+      assert(texts.join(',')==='旧格式正式答复,带标记的正式答复','The marked answer masked another answer or changed its position');
+      assert(found[0].key==='assistant:legacy','The legacy answer lost its message ID');
+      assert(found[0].parts[0].querySelector('img')&&!found[1].parts.some(part=>part.matches('img')||part.querySelector('img')),'The image was lost or copied into the neighboring reply');
     }finally{root.remove();}
   });
   await test('无法扫完整段历史时失败，不返回部分会话冒充完整结果',async()=>{

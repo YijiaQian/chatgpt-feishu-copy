@@ -4,13 +4,16 @@
   const userSelector='[data-message-author-role="user"],[data-chatgpt-search-unit-key$=":user"],[data-user-message-bubble],.rich-text-user-turn,[data-markdown-text-tone="user-message"],[data-turn="user"]';
   const assistantBody='[data-markdown-text-style="assistant-message"]';
   const assistantAuthor='[data-message-author-role="assistant"]';
-  const assistantSelector=assistantAuthor+','+assistantBody+',[data-turn="assistant"]';
+  const assistantOwner=assistantAuthor+',[data-turn="assistant"]';
+  const assistantSelector=assistantOwner+','+assistantBody;
+  const legacyAssistantBody='.markdown,[data-message-content]';
   const selectors=userSelector+','+assistantSelector+',[data-chatgpt-selection-message-id]';
   const turnSelector='[data-turn-key],[data-content-search-turn-key],[data-testid^="conversation-turn-"]';
   const mainSelector='main,[role="main"]';
   const transcriptSelector='.thread-scroll-container,#thread,[data-conversation-id]';
   const excluded='[data-cfb-ui],nav,aside,dialog,[role="dialog"],[role="complementary"],[role="search"],[contenteditable="true"],[hidden],[inert],[aria-hidden="true"],[data-message-author-role]:not([data-message-author-role="user"],[data-message-author-role="assistant"])';
   const scopeError='无法确定当前会话的消息范围，请关闭会话预览或搜索结果，刷新当前会话后重试。';
+  const unloadedHistory='页面上还有历史消息未显示，请手动滚过空白区域，等消息显示后重试。';
   const ownerOf=node=>node.closest(transcriptSelector)||node.closest(mainSelector);
   const roleOf=node=>node.matches(userSelector)||node.matches('[data-chatgpt-selection-message-id]')&&node.querySelector(userSelector)&&!node.querySelector(assistantSelector)?'user':'assistant';
   function visible(node){
@@ -28,8 +31,12 @@
       const hasMarkedReply=turn&&[...turn.querySelectorAll(assistantBody)].some(isAssistantBody);
       if(!hasMarkedReply)return [node];
     }
-    // A turn or selection ID identifies a container, including status panels.
-    // Export marked reply text and media, without text from other descendants.
+    // A selection ID can also identify a status panel. Require an assistant
+    // owner when taking Markdown that lacks the modern reply marker.
+    if(!bodies.length&&node.matches(assistantOwner)){
+      const legacy=node.matches(legacyAssistantBody)?[node]:[...node.querySelectorAll(legacyAssistantBody)];
+      bodies.push(...legacy.filter(body=>body.closest(assistantOwner)===node&&isAssistantBody(body)));
+    }
     const media=[...node.querySelectorAll('img,canvas'),...(globalThis.CFBCharts?.chartRoots(node)||[])]
       .filter(part=>visible(part)&&!bodies.some(body=>part.contains(body))&&
         !part.closest('[data-d-component="favicon"],[data-markdown-copy="exclude"],.sr-only,[role="status"],summary'));
@@ -51,11 +58,25 @@
       if(belongs&&parts.some(part=>!belongs(part)||[...part.querySelectorAll(transcriptSelector)].some(child=>!belongs(child)&&child.querySelector(selectors))))throw new Error(scopeError);
       if(parts.length)candidates.set(node,{node,role,parts,turn});
     }
-    const messages=[...candidates.values()].filter(({node,role})=>{
+    const distinct=[...candidates.values()].filter(({node,role,parts})=>{
       for(let parent=node.parentElement;parent&&parent!==root;parent=parent.parentElement){
-        if(candidates.get(parent)?.role===role)return false;
+        const ancestor=candidates.get(parent);
+        if(ancestor?.role===role&&(role==='user'||parts.every(part=>ancestor.parts.some(outer=>outer.contains(part)))))return false;
       }
       return true;
+    });
+    // A retained child reply owns its parts, even if a parent also found its media.
+    for(const {node,role,parts} of distinct){
+      if(role!=='assistant')continue;
+      for(let parent=node.parentElement;parent&&parent!==root;parent=parent.parentElement){
+        const ancestor=candidates.get(parent);
+        if(ancestor?.role===role)ancestor.parts=ancestor.parts.filter(part=>!parts.some(child=>child.contains(part)));
+      }
+    }
+    const messages=distinct.filter(message=>message.parts.length).sort((a,b)=>{
+      const first=a.parts[0],second=b.parts[0];
+      if(first===second)return 0;
+      return first.compareDocumentPosition(second)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1;
     });
     return messages.map(({node,role,parts,turn})=>{
       const owner=node.closest('[data-message-id],[data-chatgpt-selection-message-id]');
@@ -73,6 +94,20 @@
     }
     const overflowing=node=>node&&node.scrollHeight>node.clientHeight+2;
     return containers.find(overflowing)||(overflowing(page.scrollingElement)?page.scrollingElement:containers[0]||page.scrollingElement);
+  }
+  function mountedHistoryCoversViewport(root,scroller,inScope){
+    const row=[...root.querySelectorAll('[data-rail-chat-transcript] [data-virtualized-turn]')].find(inScope);
+    const track=row?.parentElement;
+    const layout=track?.parentElement;
+    if(!layout?.style.height||getComputedStyle(layout).position!=='relative')return true;
+    // The layout reserves space for the full history. The inner track holds
+    // only the mounted turns and offsets them by the unmounted leading space.
+    const full=layout.getBoundingClientRect(),mounted=track.getBoundingClientRect();
+    const viewportTop=scroller===document.scrollingElement?0:scroller.getBoundingClientRect().top+scroller.clientTop;
+    const top=scroller.scrollTop<2?full.top:Math.max(full.top,viewportTop);
+    const bottom=scroller.scrollTop+scroller.clientHeight>=scroller.scrollHeight-3?
+      full.bottom:Math.min(full.bottom,viewportTop+scroller.clientHeight);
+    return bottom<=top||mounted.top<=top+2&&mounted.bottom>=bottom-2;
   }
   function resolveContext(page=document){
     const conversationId=page.location.pathname.match(/\/c\/([^/]+)\/?$/)?.[1];
@@ -129,7 +164,7 @@
     }
   }
   function streaming(root,accept=()=>true){return [...root.querySelectorAll('[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="停止生成"],.result-streaming,[data-is-streaming="true"]')].some(node=>visible(node)&&accept(node));}
-  async function collect({scope,root,scroller,convert,signal,onProgress=()=>{},delay=350,maxSteps=4000,maxBytes=128*1024*1024}={}){
+  async function collect({scope,root,scroller,convert,signal,onProgress=()=>{},waitForManualTop=false,delay=350,maxSteps=4000,maxBytes=128*1024*1024}={}){
     if(typeof convert!=='function')throw new Error('会话转换服务未连接。');
     const context=scope||(root?{root,scroller:scroller||root,isStreaming:()=>streaming(root)}:resolveContext());
     ({root,scroller}=context);
@@ -141,9 +176,16 @@
     const originalAnchor=anchor?{key:anchor.getAttribute('data-turn-key'),offset:anchor.getBoundingClientRect().top-scroller.getBoundingClientRect().top}:null;
     let total=0,completed=false,capture;
     const move=top=>scroller.scrollTo({top,behavior:'instant'});
+    const scrollStep=()=>Math.max(1,Math.floor(scroller.clientHeight*0.75));
+    const historyMounted=()=>mountedHistoryCoversViewport(root,scroller,inScope);
     const report=phase=>onProgress({phase,messages:records.size,users:[...records.values()].filter(r=>r.role==='user').length,scrollTop:scroller.scrollTop,scrollHeight:scroller.scrollHeight,viewport:scroller.clientHeight});
     async function sample(){
       check();if(context.isStreaming())throw new Error('对话正在生成新内容，请等待完成后重试。');
+      for(let attempt=0;!historyMounted();attempt++){
+        if(attempt===19)throw new Error(unloadedHistory);
+        report('history');await pause(delay*2,signal);check();
+        if(context.isStreaming())throw new Error('对话正在生成新内容，请等待完成后重试。');
+      }
       const batch=messages(root,context.belongs);
       if(!batch.length)throw new Error('当前会话的消息未加载，请刷新会话后重试。');
       mergeOrder(order,batch.map(item=>item.key));
@@ -160,16 +202,46 @@
       }
     }
     try{
-      // Reach the actual top repeatedly: lazy history prepends can move the
-      // scrollbar even after the first scrollTo(0).
-      let topSignature='',topStable=0;
-      for(let i=0;i<20;i++){
-        check();report('history');move(0);await pause(delay*2,signal);check();
-        const batch=messages(root,context.belongs),signature=batch.slice(0,3).map(r=>r.key).join('|')+':'+scroller.scrollHeight;
-        if(batch.length&&signature===topSignature&&scroller.scrollTop<2)topStable++;else topStable=0;
-        topSignature=signature;if(topStable>=2)break;
-        if(i===19)throw new Error('历史消息持续加载，暂时无法确定会话开头，请稍后重试。');
+      // A virtual list can restore the previous position after a jump. Walk
+      // up in overlapping steps if that happens, then wait for lazy history.
+      const topPositions=new Set();
+      const autoUntil=performance.now()+20000;
+      let topSignature='',topStable=0,topStalls=0,stepUp=false,topUnloaded=false;
+      const confirmTop=()=>{
+        topUnloaded=!historyMounted();
+        const batch=scroller.scrollTop<2&&!topUnloaded?messages(root,context.belongs):[];
+        const signature=batch.length?batch.slice(0,3).map(r=>r.key).join('|')+':'+scroller.scrollHeight:'';
+        topStable=signature&&signature===topSignature?topStable+1:0;
+        topSignature=signature;
+      };
+      for(let i=0;i<Math.max(20,maxSteps)&&topStalls<20&&performance.now()<autoUntil;i++){
+        check();report('history');
+        const before=scroller.scrollTop;
+        const target=stepUp?Math.max(0,before-scrollStep()):0;
+        if(before>=2)move(target);
+        await pause(target>=2?delay:delay*2,signal);check();
+        const after=scroller.scrollTop;
+        if(after>=2){
+          stepUp=true;topSignature='';topStable=0;
+          const bucket=Math.max(1,scrollStep()/2);
+          const position=Math.round(after/bucket)+':'+Math.round(scroller.scrollHeight/bucket);
+          topStalls=after<before-1&&!topPositions.has(position)?0:topStalls+1;
+          topPositions.add(position);
+          continue;
+        }
+        confirmTop();
+        if(topStable>=2)break;
+        topStalls++;
       }
+      if(topStable<2&&waitForManualTop){
+        // Release the scroll position so the page can react to real input.
+        report('manual-top');topSignature='';topStable=0;
+        const manualUntil=performance.now()+120000;
+        while(topStable<2&&performance.now()<manualUntil){
+          await pause(delay,signal);check();confirmTop();
+        }
+      }
+      if(topStable<2)throw new Error(topUnloaded?unloadedHistory:'暂时无法确认会话开头，请手动滚到顶部，等历史消息加载完成后重试。');
       let bottomSignature='',bottomStable=0;
       for(let step=0;step<maxSteps;step++){
         await sample();report('history');
@@ -180,7 +252,7 @@
           if(bottomStable>=2){completed=true;break;}
           move(scroller.scrollHeight);await pause(delay*2,signal);
         }else{
-          bottomStable=0;move(scroller.scrollTop+Math.max(1,Math.floor(scroller.clientHeight*0.75)));await pause(delay,signal);
+          bottomStable=0;move(scroller.scrollTop+scrollStep());await pause(delay,signal);
         }
       }
       if(!completed)throw new Error('历史消息扫描未完成，未生成可能缺页的文件。');

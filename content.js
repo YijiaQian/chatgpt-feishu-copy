@@ -109,7 +109,11 @@
     shadow.querySelector('h2').textContent=action+'当前会话';
     const cancel=shadow.querySelector('button');cancel.textContent='取消'+action;
     cancel.addEventListener('click',()=>{task.abort();shadow.querySelector('#state').textContent='正在停止，将在当前图片处理后退出…';});
-    document.documentElement.append(host);return {host,update:info=>{shadow.querySelector('#state').textContent=(info.phase==='convert'?'正在转换文字、公式与图片…':'正在加载历史消息…')+'\n已收集 '+info.messages+' 条消息';}};
+    document.documentElement.append(host);return {host,update:info=>{
+      const message=info.phase==='convert'?'正在转换文字、公式与图片…':info.phase==='manual-top'?
+        '页面多次跳回原位。请用滚轮向上滚到第一条消息，加载完成后会自动继续。':'正在加载历史消息…';
+      shadow.querySelector('#state').textContent=message+'\n已收集 '+info.messages+' 条消息';
+    }};
   }
   async function startConversation(copying){
     if(busy)return {ok:false,error:'上一份内容仍在转换或导出，请稍候。'};
@@ -124,7 +128,7 @@
     const abort=()=>task.abort();controller.signal.addEventListener('abort',abort,{once:true});
     (async()=>{
       try{
-        const archive=await CFBConversation.collect({scope,signal:task.signal,onProgress:panel.update,convert:async message=>{
+        const archive=await CFBConversation.collect({scope,signal:task.signal,onProgress:panel.update,waitForManualTop:true,convert:async message=>{
           const result=await convertSource({parts:message.parts,userMessage:message.role==='user'},{embedImages:true});
           const attachments=[...message.node.querySelectorAll('button,[role="button"],a[download]')].filter(e=>/\.(?:pdf|docx?|xlsx?|pptx?|zip|csv|json|txt)\b/i.test(e.textContent)&&!e.querySelector('img'));
           for(const label of [...new Set(attachments.map(e=>e.textContent.trim()))]){result.html+='<p>附件：'+CFB.esc(label)+'（仅保存名称，原文件未打包）</p>';result.warnings.push('附件“'+label+'”仅保存名称，原文件未打包。');}
