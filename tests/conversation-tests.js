@@ -34,6 +34,121 @@
       assert(Math.abs(f.root.scrollTop-700)<3,'The active transcript scroll position was not restored');
     }finally{page.remove();}
   });
+  await test('页面跳回底部时，分步滚到顶部并从第一条开始采集',async()=>{
+    const f=fixture(16);
+    const move=f.root.scrollTo.bind(f.root);
+    let bounced=0;
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const originalTop=f.root.scrollTop;
+    f.root.scrollTo=options=>{
+      if(options.top===0&&f.root.scrollTop>f.root.clientHeight){
+        bounced++;
+        move({...options,top:originalTop});
+      }else move(options);
+      f.render();
+    };
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:5});
+      assert(bounced===1,'A rejected jump should be followed by incremental scrolling');
+      assert(archive.messages.length===16&&archive.messages.every((message,index)=>message.key.endsWith('turn-'+index+':0')),'The scan missed or reordered part of the conversation');
+      assert(Math.abs(f.root.scrollTop-originalTop)<3,'The original scroll position was not restored');
+    }finally{f.remove();}
+  });
+  await test('页面持续阻止上滚时，停止采集并提示手动滚到顶部',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const move=f.root.scrollTo.bind(f.root);
+    f.root.scrollTo=options=>{if(options.top>=f.root.scrollTop)move(options);};
+    let error,converted=0;
+    try{
+      await CFBConversation.collect({root:f.root,scroller:f.root,delay:5,convert:async item=>{converted++;return convert(item);}});
+    }catch(e){error=e;}finally{f.remove();}
+    assert(converted===0&&error?.message.includes('滚到顶部'),'The scan accepted a partial history or omitted the recovery instruction');
+  });
+  await test('滚动位置反复来回变化时，提前结束上滚探测',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const initial=f.root.scrollTop,move=f.root.scrollTo.bind(f.root);
+    let moves=0,error;
+    f.root.scrollTo=options=>{
+      moves++;
+      const top=options.top===0||options.top<initial-200?initial:options.top;
+      move({...options,top});f.render();
+    };
+    try{await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:3,maxSteps:70});}
+    catch(e){error=e;}finally{f.root.remove();}
+    assert(error?.message.includes('滚到顶部')&&moves<35,'Repeated positions kept resetting the retry count');
+  });
+  await test('自动上滚受阻后释放滚动条，手动到顶时继续同一次采集',async()=>{
+    const f=fixture(16);
+    f.root.scrollTop=f.root.scrollHeight;f.render();
+    const move=f.root.scrollTo.bind(f.root);
+    let waiting=false,manualScrolled=false,automaticWhileWaiting=0,convertedBeforeTop=0;
+    f.root.scrollTo=options=>{
+      if(waiting)automaticWhileWaiting++;
+      if(options.top>=f.root.scrollTop||!waiting&&f.root.scrollTop===0)move(options);
+      f.render();
+    };
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,delay:8,waitForManualTop:true,onProgress:info=>{
+        if(info.phase!=='manual-top')return;
+        waiting=true;
+        setTimeout(()=>{manualScrolled=true;move({top:0});f.render();},25);
+      },convert:async message=>{
+        if(!manualScrolled)convertedBeforeTop++;
+        waiting=false;
+        return convert(message);
+      }});
+      assert(automaticWhileWaiting===0&&convertedBeforeTop===0,'The extension fought manual scrolling or copied before the start was confirmed');
+      assert(archive.messages.length===16&&archive.messages.every((message,i)=>message.key.endsWith('turn-'+i+':0')),'The resumed copy omitted or reordered messages');
+    }finally{f.root.remove();}
+  });
+  function spacedHistory(){
+    const root=document.createElement('main');
+    root.style.cssText='height:200px;width:600px;overflow:auto;overflow-anchor:none';
+    root.innerHTML=`<div data-rail-chat-transcript><div></div><div style="position:relative;display:flow-root;height:560px">
+      <div style="margin-top:0">
+        <div data-virtualized-turn><article data-turn-key="first" style="height:160px"><div data-message-author-role="user">问题一</div><div data-message-author-role="assistant">回答一</div></article></div>
+      </div></div><div></div></div>`;
+    document.body.append(root);
+    const window=root.querySelector('[data-virtualized-turn]').parentElement;
+    const move=root.scrollTo.bind(root);
+    const last=`<div data-virtualized-turn><article data-turn-key="last" style="height:400px"><div data-message-author-role="user">问题二</div><div data-message-author-role="assistant">回答二</div></article></div>`;
+    return {root,window,last,move};
+  }
+  await test('顶部还只挂载后段消息时，等占位消失再复制',async()=>{
+    const f=spacedHistory();
+    const first=f.window.innerHTML;
+    f.window.style.marginTop='450px';
+    f.window.innerHTML=f.last;
+    const load=setTimeout(()=>{
+      f.window.style.marginTop='0';
+      f.window.innerHTML=first+f.last;
+    },230);
+    try{
+      const archive=await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:8});
+      assert(archive.messages.map(message=>message.text).join(',')==='问题一,回答一,问题二,回答二','Copy finished before the earlier rows were mounted');
+    }finally{clearTimeout(load);f.root.remove();}
+  });
+  await test('虚拟列表中间或末尾还有占位时，不能把局部扫描当作完整结果',async()=>{
+    for(const gap of ['middle','end']){
+      const f=spacedHistory();
+      f.window.parentElement.style.height='850px';
+      f.window.querySelector('article').style.height='300px';
+      if(gap==='end')f.window.insertAdjacentHTML('beforeend',f.last);
+      f.root.scrollTo=options=>{
+        if(gap==='middle'&&options.top>=150){
+          f.window.style.marginTop='450px';
+          f.window.innerHTML=f.last;
+        }
+        f.move(options);
+      };
+      let err;
+      try{await CFBConversation.collect({root:f.root,scroller:f.root,convert,delay:5,maxSteps:18});}
+      catch(e){err=e;}finally{f.root.remove();}
+      assert(err?.message.includes('历史消息'),`Accepted incomplete history with a gap at the ${gap}`);
+    }
+  });
   await test('两个可见会话无法确定归属时，读取正文前停止',async()=>{
     const page=document.createElement('main');page.innerHTML='<div class="thread-scroll-container"><article data-turn-key="one"><div data-message-author-role="user">第一段会话</div></article></div><div class="thread-scroll-container"><article data-turn-key="two"><div data-message-author-role="user">第二段会话</div></article></div>';
     document.body.append(page);let calls=0,error;
